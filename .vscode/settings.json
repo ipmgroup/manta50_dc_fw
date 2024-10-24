@@ -1,0 +1,24 @@
+{
+    "cmake.configureOnOpen": false,
+    "files.associations": {
+        "*.py": "python",
+        "main_env.h": "c",
+        "can-fifo.h": "c",
+        "user.h": "c",
+        "canard_c2000.h": "c",
+        "hal_obj.h": "c",
+        "*.c_p": "c",
+        "eeprom-pm.h": "c",
+        "dronecan.h": "c",
+        "canard.h": "c"
+    },
+    "[cpp]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true
+    },
+    "[c]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true
+    },
+    "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: Google, IndentWidth: 4, ColumnLimit: 0, AllowShortFunctionsOnASingleLine: All, BreakBeforeBraces: Attach, SortIncludes: false }"
+}

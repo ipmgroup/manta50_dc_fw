@@ -1,0 +1,42 @@
+{
+    "env": {
+        "SDKPath": "${HOME}/ti/motorware/motorware_1_01_00_18",
+        "StdLibPath": "${HOME}/ti/ti-cgt-c2000_22.6.1.LTS"
+    },
+    "configurations": [
+        {
+            "name": "TI",
+            "includePath": [
+                "${workspaceRoot}/**"
+            ],
+            "browse": {
+                "path": [
+                    "${StdLibPath}/**",
+                    "${SDKPath}/**"
+                ]
+            },
+            "defines": [
+                "FLASH",
+                "RESET_MCP_ON_INACTIVITY=1",
+                "EEPROM_25AA02",
+                "NODE_ID=6",
+                "ARCH_BYTE16",
+                "DRV8305",
+                // "CANOPEN",
+                "LED_ON",
+                "CS_GPIO",
+                "FAST_ROM_V1p7",
+                "F2802xF",
+                "CS_GPIO",
+                "MCP2515",
+                "nFault",
+                "WORD_ADDRESSING_IS_16BITS"
+            ],
+            "compilerPath": "",
+            "cStandard": "c99",
+            "cppStandard": "c++03",
+            "intelliSenseMode": "gcc-x86"
+        }
+    ],
+    "version": 4
+}
