@@ -505,7 +505,7 @@ void HAL_enableDebugInt(HAL_Handle handle)
   return;
 } // end of HAL_enableDebugInt() function
 
-
+#ifdef DRV8305
 void HAL_enableDrv(HAL_Handle handle)
 {
   HAL_Obj *obj = (HAL_Obj *)handle;
@@ -514,7 +514,7 @@ void HAL_enableDrv(HAL_Handle handle)
 
   return;
 }  // end of HAL_enableDrv() function
-
+#endif
 
 void HAL_enableGlobalInts(HAL_Handle handle)
 {
@@ -676,9 +676,10 @@ HAL_Handle HAL_init(void *pMemory,const size_t numBytes)
   obj->timerHandle[1] = TIMER_init((void *)TIMER1_BASE_ADDR,sizeof(TIMER_Obj));
   obj->timerHandle[2] = TIMER_init((void *)TIMER2_BASE_ADDR,sizeof(TIMER_Obj));
 
-
+#ifdef DRV8305
   // initialize drv8305 interface
   obj->drv8305Handle = DRV8305_init(&obj->drv8305,sizeof(obj->drv8305));
+#endif
 
 #ifdef MCP2515
   // initialize MCP2515 interface
@@ -770,7 +771,7 @@ void HAL_setParams(HAL_Handle handle,const USER_Params *pUserParams)
                 pUserParams->pwmPeriod_usec,
                 USER_NUM_PWM_TICKS_PER_ISR_TICK);
 
-#ifndef SPI_TEST_MCP2515
+#ifdef SPI_TEST_MCP2515
   // setup the spiA
   HAL_setupSpiA(handle);
 #else
@@ -783,9 +784,10 @@ void HAL_setParams(HAL_Handle handle,const USER_Params *pUserParams)
   HAL_setupTimers(handle,
                   (float_t)pUserParams->systemFreq_MHz);
 
-
+#ifdef DRV8305
   // setup the drv8305 interface
   HAL_setupGate(handle);
+#endif
 
 #ifdef MCP2515
   // setup the mcp2515 interface
@@ -887,7 +889,7 @@ void HAL_setupAdcs(HAL_Handle handle)
   ADC_setIntSrc(obj->adcHandle,ADC_IntNumber_1,ADC_IntSrc_EOC7);
 
 
-  //configure the SOCs for boostxldrv8305evm_revA
+  //configure the SOCs for BLDC_6050
   // sample the first sample twice due to errata sprz342f
   // ISEN_A
   ADC_setSocChanNumber(obj->adcHandle,ADC_SocNumber_0,ADC_SocChanNumber_B1);
@@ -929,10 +931,17 @@ void HAL_setupAdcs(HAL_Handle handle)
   ADC_setSocTrigSrc(obj->adcHandle,ADC_SocNumber_7,ADC_SocTrigSrc_EPWM1_ADCSOCA);
   ADC_setSocSampleDelay(obj->adcHandle,ADC_SocNumber_7,ADC_SocSampleDelay_7_cycles);
 
-  // Humidity
-  ADC_setSocChanNumber(obj->adcHandle, ADC_SocNumber_8, ADC_SocChanNumber_A6);
-  ADC_setupSocTrigSrc(obj->adcHandle, ADC_SocNumber_8, ADC_Int1TriggersSOC);
-  ADC_setSocSampleDelay(obj->adcHandle, ADC_SocNumber_8, ADC_SocSampleDelay_9_cycles);
+  // Temperatursensor LM61 an ADCINA6
+  ADC_setSocChanNumber(obj->adcHandle,ADC_SocNumber_8,ADC_SocChanNumber_A6);
+  ADC_setSocTrigSrc(obj->adcHandle,ADC_SocNumber_8,ADC_SocTrigSrc_EPWM1_ADCSOCA);
+  ADC_setSocSampleDelay(obj->adcHandle,ADC_SocNumber_8, ADC_SocSampleDelay_7_cycles); // ADC_SocSampleDelay_15_cycles
+
+  // Throttle
+//  ADC_setSocChanNumber(obj->adcHandle,ADC_SocNumber_9,ADC_SocChanNumber_A4);
+//  ADC_setupSocTrigSrc(obj->adcHandle,ADC_SocNumber_9,ADC_SocTrigSrc_EPWM1_ADCSOCA);
+//  ADC_setSocSampleDelay(obj->adcHandle,ADC_SocNumber_9,ADC_SocSampleDelay_15_cycles);
+
+
   return;
 } // end of HAL_setupAdcs() function
 
@@ -987,6 +996,7 @@ void HAL_setupFlash(HAL_Handle handle)
   return;
 } // HAL_setupFlash() function
 
+#ifdef DRV8305
 
 void HAL_setupGate(HAL_Handle handle)
 {
@@ -1000,6 +1010,8 @@ void HAL_setupGate(HAL_Handle handle)
 #endif
 } // HAL_setupGate() function
 
+#endif
+
 #ifdef MCP2515
 void HAL_setupMCP2515(HAL_Handle handle)
 {
@@ -1007,14 +1019,14 @@ void HAL_setupMCP2515(HAL_Handle handle)
 
   MCP2515_setSpiHandle(obj->mcp2515Handle,obj->spiAHandle);
   MCP2515_setGpioHandle(obj->mcp2515Handle,obj->gpioHandle);
-  MCP2515_setGpio_INT(obj->mcp2515Handle,GPIO_Number_28);
-  MCP2515_setGpio_CS(obj->mcp2515Handle,GPIO_Number_29);
+  MCP2515_setGpio_INT(obj->mcp2515Handle,GPIO_Number_4);
+  MCP2515_setGpio_CS(obj->mcp2515Handle,GPIO_Number_19);
 
-  PIE_enableInt(obj->pieHandle, PIE_GroupNumber_1, PIE_InterruptSource_XINT_1);
-  CPU_enableInt(obj->cpuHandle, CPU_IntNumber_1);
-  GPIO_setExtInt(obj->gpioHandle, GPIO_Number_28, CPU_ExtIntNumber_1);
-  PIE_setExtIntPolarity(obj->pieHandle, CPU_ExtIntNumber_1, PIE_ExtIntPolarity_FallingEdge);
-  PIE_enableExtInt(obj->pieHandle, CPU_ExtIntNumber_1);
+  PIE_enableInt(obj->pieHandle,PIE_GroupNumber_1,PIE_InterruptSource_XINT_1);
+  CPU_enableInt(obj->cpuHandle,CPU_IntNumber_1);
+  GPIO_setExtInt(obj->gpioHandle,GPIO_Number_4,CPU_ExtIntNumber_1);
+  PIE_setExtIntPolarity(obj->pieHandle,CPU_ExtIntNumber_1,PIE_ExtIntPolarity_FallingEdge);
+  PIE_enableExtInt(obj->pieHandle,CPU_ExtIntNumber_1);
 } // HAL_setupMCP2515() function
 #endif
 
@@ -1022,9 +1034,9 @@ void HAL_setupMCP2515(HAL_Handle handle)
 void HAL_setupEEPROM25AA02(HAL_Handle handle){
 	HAL_Obj *obj = (HAL_Obj *)handle;
 
-	EEPROM25AA02_setSpiHandle(obj->eeprom25aa02Handle, obj->spiAHandle);
-	EEPROM25AA02_setGpioHandle(obj->eeprom25aa02Handle, obj->gpioHandle);
-	EEPROM25AA02_setGpio_CS(obj->eeprom25aa02Handle, GPIO_Number_34);
+	EEPROM25AA02_setSpiHandle(obj->eeprom25aa02Handle,obj->spiAHandle);
+	EEPROM25AA02_setGpioHandle(obj->eeprom25aa02Handle,obj->gpioHandle);
+	EEPROM25AA02_setGpio_CS(obj->eeprom25aa02Handle,GPIO_Number_33);
 }
 #endif
 
@@ -1060,6 +1072,7 @@ void HAL_setupGpios(HAL_Handle handle)
   GPIO_setMode(obj->gpioHandle,GPIO_Number_5,GPIO_5_Mode_ECAP1);
 #endif
 
+#ifdef DRV8305
   // EN_GATE
   GPIO_setMode(obj->gpioHandle,GPIO_Number_4,GPIO_4_Mode_GeneralPurpose);
   GPIO_setLow(obj->gpioHandle,GPIO_Number_4);
@@ -1069,11 +1082,13 @@ void HAL_setupGpios(HAL_Handle handle)
   GPIO_setMode(obj->gpioHandle,GPIO_Number_33,GPIO_33_Mode_GeneralPurpose);
   GPIO_setHigh(obj->gpioHandle,GPIO_Number_33);
   GPIO_setDirection(obj->gpioHandle,GPIO_Number_33,GPIO_Direction_Output);
-  
-  // No Connection
-  GPIO_setMode(obj->gpioHandle,GPIO_Number_32,GPIO_32_Mode_GeneralPurpose);
-  GPIO_setDirection(obj->gpioHandle, GPIO_Number_32, GPIO_Direction_Output);
-  GPIO_setHigh(obj->gpioHandle, GPIO_Number_32);
+#endif  
+
+  // EN_GATE
+ GPIO_setMode(obj->gpioHandle,GPIO_Number_34,GPIO_34_Mode_GeneralPurpose);
+ GPIO_setDirection(obj->gpioHandle,GPIO_Number_34,GPIO_Direction_Output);
+ GPIO_setLow(obj->gpioHandle,GPIO_Number_34);
+ //GPIO_setHigh(obj->gpioHandle, GPIO_Number_34);
 
   // SPI_SDI 
   GPIO_setMode(obj->gpioHandle,GPIO_Number_16,GPIO_16_Mode_SPISIMOA);
@@ -1089,6 +1104,7 @@ void HAL_setupGpios(HAL_Handle handle)
   // SPI_CLK
   GPIO_setMode(obj->gpioHandle,GPIO_Number_18,GPIO_18_Mode_SPICLKA);
 
+#ifdef DRV8305
   // SPI_SCS
 #ifdef CS_GPIO
   GPIO_setMode(obj->gpioHandle,GPIO_Number_19,GPIO_19_Mode_GeneralPurpose);
@@ -1097,14 +1113,17 @@ void HAL_setupGpios(HAL_Handle handle)
 #else
   GPIO_setMode(obj->gpioHandle,GPIO_Number_19,GPIO_19_Mode_SPISTEA_NOT);
 #endif
+#endif
+
   // SPI_SCS_EPROM
-  GPIO_setMode(obj->gpioHandle,GPIO_Number_34,GPIO_34_Mode_GeneralPurpose);
-  GPIO_setDirection(obj->gpioHandle, GPIO_Number_34, GPIO_Direction_Output);
-  //GPIO_setLow(obj->gpioHandle, GPIO_Number_34);
-  GPIO_setHigh(obj->gpioHandle, GPIO_Number_34);
+  GPIO_setMode(obj->gpioHandle,GPIO_Number_33,GPIO_33_Mode_GeneralPurpose);
+  GPIO_setDirection(obj->gpioHandle,GPIO_Number_33,GPIO_Direction_Output);
+  GPIO_setHigh(obj->gpioHandle,GPIO_Number_33);
+
   
-  // nFAULT
+  // TZ-1
   GPIO_setMode(obj->gpioHandle,GPIO_Number_12,GPIO_12_Mode_TZ1_NOT);
+
 
 #ifdef SCI
   // SCI_RX
@@ -1116,18 +1135,24 @@ void HAL_setupGpios(HAL_Handle handle)
 
 #ifdef MCP2515
   // MCP2515_CS
-  GPIO_setMode(obj->gpioHandle,GPIO_Number_29,GPIO_29_Mode_GeneralPurpose);
-  GPIO_setDirection(obj->gpioHandle, GPIO_Number_29, GPIO_Direction_Output);
-  GPIO_setHigh(obj->gpioHandle, GPIO_Number_29);
+  GPIO_setMode(obj->gpioHandle,GPIO_Number_19,GPIO_19_Mode_GeneralPurpose);
+  GPIO_setDirection(obj->gpioHandle,GPIO_Number_19,GPIO_Direction_Output);
+  GPIO_setHigh(obj->gpioHandle,GPIO_Number_19);
 
   // MCP2515_INT
-  GPIO_setMode(obj->gpioHandle,GPIO_Number_28,GPIO_28_Mode_GeneralPurpose);
-  GPIO_setDirection(obj->gpioHandle, GPIO_Number_28, GPIO_Direction_Input);
-  //GPIO_setPullUp(obj->gpioHandle, GPIO_Number_28, GPIO_PullUp_Enable);
-  GPIO_setPullUp(obj->gpioHandle, GPIO_Number_28, GPIO_PullUp_Disable);
-  GPIO_setQualification(obj->gpioHandle, GPIO_Number_28, GPIO_Qual_Sync);
+  GPIO_setMode(obj->gpioHandle,GPIO_Number_4,GPIO_4_Mode_GeneralPurpose);
+  GPIO_setDirection(obj->gpioHandle,GPIO_Number_4,GPIO_Direction_Input);
+  GPIO_setPullUp(obj->gpioHandle,GPIO_Number_4,GPIO_PullUp_Disable);
+  GPIO_setQualification(obj->gpioHandle,GPIO_Number_4,GPIO_Qual_Sync);
 
 #endif
+
+  // LED
+  GPIO_setMode(obj->gpioHandle,GPIO_Number_32,GPIO_32_Mode_GeneralPurpose);
+  GPIO_setLow(obj->gpioHandle,GPIO_Number_32);
+  GPIO_setDirection(obj->gpioHandle,GPIO_Number_32,GPIO_Direction_Output);
+
+
 
   // JTAG
   GPIO_setMode(obj->gpioHandle,GPIO_Number_35,GPIO_35_Mode_JTAG_TDI);
@@ -1195,6 +1220,10 @@ void HAL_setupPeripheralClks(HAL_Handle handle)
   
   CLK_enableTbClockSync(obj->clkHandle);
 
+    /* enable clocks for DMA and McBSPA */
+  //CLK_enableDMAClock(obj->clkHandle);
+  //CLK_enableMcBSPAClock(obj->clkHandle);
+  
   return;
 } // end of HAL_setupPeripheralClks() function
 
@@ -1358,6 +1387,7 @@ void HAL_setupPwms(HAL_Handle handle,
 
 #ifdef CS_GPIO
 
+#ifdef DRV8305
 void HAL_setupSpiA(HAL_Handle handle)
 {
   HAL_Obj   *obj = (HAL_Obj *)handle;
@@ -1369,8 +1399,6 @@ void HAL_setupSpiA(HAL_Handle handle)
   SPI_enableTx(obj->spiAHandle);
   SPI_disableTxFifoEnh(obj->spiAHandle);
   SPI_disableRxFifoInt(obj ->spiAHandle);
-//  SPI_setTxDelay(obj->spiAHandle,0x0010); //???????????????????
-//  SPI_enableInt(obj->spiAHandle);
   SPI_setBaudRate(obj->spiAHandle, (SPI_BaudRate_e)(0x0001)); //1
   SPI_setCharLength(obj->spiAHandle,SPI_CharLength_16_Bits);
   SPI_setSuspend(obj->spiAHandle,SPI_TxSuspend_free);
@@ -1378,6 +1406,8 @@ void HAL_setupSpiA(HAL_Handle handle)
 
   return;
 }  // end of HAL_setupSpiA() function
+#endif
+
 #ifdef MCP2515
 void HAL_setupSpi_MCP2515(HAL_Handle handle)
 {
@@ -1391,7 +1421,6 @@ void HAL_setupSpi_MCP2515(HAL_Handle handle)
   SPI_disableTxFifoEnh(obj->spiAHandle);
   SPI_disableRxFifoInt(obj ->spiAHandle);
   SPI_enableInt(obj->spiAHandle);
-//  SPI_setTxDelay(obj->spiAHandle,0x0010); ////??????????????
   SPI_setBaudRate(obj->spiAHandle, (SPI_BaudRate_e)(0x0001)); //1
   SPI_setCharLength(obj->spiAHandle,SPI_CharLength_8_Bits);
   SPI_setSuspend(obj->spiAHandle,SPI_TxSuspend_free);
@@ -1400,6 +1429,7 @@ void HAL_setupSpi_MCP2515(HAL_Handle handle)
   return;
 }  // end of HAL_setupSpi_MCP2515() function
 #endif
+
 #ifdef EEPROM_25AA02
 void HAL_setupSpi_25AA02(HAL_Handle handle){
 	  HAL_Obj   *obj = (HAL_Obj *)handle;
@@ -1412,7 +1442,6 @@ void HAL_setupSpi_25AA02(HAL_Handle handle){
 	  SPI_disableTxFifoEnh(obj->spiAHandle);
 	  SPI_disableRxFifoInt(obj ->spiAHandle);
 	  SPI_enableInt(obj->spiAHandle);
-	//  SPI_setTxDelay(obj->spiAHandle,0x0010); ////??????????????
 	  SPI_setBaudRate(obj->spiAHandle, (SPI_BaudRate_e)(0x0001)); //1
 	  SPI_setCharLength(obj->spiAHandle,SPI_CharLength_8_Bits);
 	  SPI_setSuspend(obj->spiAHandle,SPI_TxSuspend_free);
@@ -1421,6 +1450,7 @@ void HAL_setupSpi_25AA02(HAL_Handle handle){
 	  return;
 }  // end of HAL_setupSpi_25AA02() function
 #endif
+
 #else
 void HAL_setupSpiA(HAL_Handle handle)
 {
@@ -1444,7 +1474,7 @@ void HAL_setupSpiA(HAL_Handle handle)
 }  // end of HAL_setupSpiA() function
 #endif
 
-
+#ifdef DVR8305
 void HAL_Spi_SW_DRV8305(HAL_Handle handle)
 {
   HAL_Obj   *obj = (HAL_Obj *)handle;
@@ -1454,6 +1484,7 @@ void HAL_Spi_SW_DRV8305(HAL_Handle handle)
   SPI_enable(obj->spiAHandle);
   return;
 }  // end of HAL_Spi_SW_DRV8305() function
+#endif
 
 void HAL_Spi_SW_MCP2515(HAL_Handle handle)
 {
@@ -1582,6 +1613,7 @@ void HAL_setupCAP(HAL_Handle handle)
 
 #endif
 
+#ifdef DRV8305
 void HAL_writeDrvData(HAL_Handle handle, DRV_SPI_8305_Vars_t *Spi_8305_Vars)
 {
   HAL_Obj  *obj = (HAL_Obj *)handle;
@@ -1602,7 +1634,6 @@ void HAL_readDrvData(HAL_Handle handle, DRV_SPI_8305_Vars_t *Spi_8305_Vars)
 }  // end of HAL_readDrvData() function
 
 
-
 void HAL_setupDrvSpi(HAL_Handle handle, DRV_SPI_8305_Vars_t *Spi_8305_Vars)
 {
   HAL_Obj  *obj = (HAL_Obj *)handle;
@@ -1612,6 +1643,6 @@ void HAL_setupDrvSpi(HAL_Handle handle, DRV_SPI_8305_Vars_t *Spi_8305_Vars)
   return;
 }  // end of HAL_setupDrvSpi() function
 
-
+#endif
 
 // end of file

@@ -81,12 +81,12 @@ extern "C" {
 //! \brief WARNING: if you know the value of your Bemf constant, and you know you are operating at a multiple speed due to field weakening, be sure to set this value higher than the expected Bemf voltage
 //! \brief It is recommended to start with a value ~3x greater than the USER_ADC_FULL_SCALE_VOLTAGE_V and increase to 4-5x if scenarios where a Bemf calculation may exceed these limits
 //! \brief This value is also used to calculate the minimum flux value: USER_IQ_FULL_SCALE_VOLTAGE_V/USER_EST_FREQ_Hz/0.7
-#define USER_IQ_FULL_SCALE_VOLTAGE_V (24.0)  // 24.0 Set to Vbus
+#define USER_IQ_FULL_SCALE_VOLTAGE_V (55.0)  // 24.0 Set to Vbus
 
 //! \brief Defines the maximum voltage at the input to the AD converter
 //! \brief The value that will be represented by the maximum ADC input (3.3V) and conversion (0FFFh)
 //! \brief Hardware dependent, this should be based on the voltage sensing and scaling to the ADC input
-#define USER_ADC_FULL_SCALE_VOLTAGE_V (44.30)  // BOOSTXL-DRV8305EVM = 44.30 V
+#define USER_ADC_FULL_SCALE_VOLTAGE_V (57.528)  // Manta100
 
 //! \brief Defines the voltage scale factor for the system
 //! \brief Compile time calculation for scale factor (ratio) used throughout the system
@@ -95,12 +95,12 @@ extern "C" {
 //! \brief Defines the full scale current for the IQ variables, A
 //! \brief All currents are converted into (pu) based on the ratio to this value
 //! \brief WARNING: this value MUST be larger than the maximum current readings that you are expecting from the motor or the reading will roll over to 0, creating a control issue
-#define USER_IQ_FULL_SCALE_CURRENT_A (20.0)  // BOOSTXL-DRV8305EVM = 20.0 A
+#define USER_IQ_FULL_SCALE_CURRENT_A (70.0)  // Manta100 DRV8323 = 70.0A GAIN-20V/V Rsh=1mR
 
 //! \brief Defines the maximum current at the AD converter
 //! \brief The value that will be represented by the maximum ADC input (3.3V) and conversion (0FFFh)
 //! \brief Hardware dependent, this should be based on the current sensing and scaling to the ADC input
-#define USER_ADC_FULL_SCALE_CURRENT_A (47.14)  // BOOSTXL-DRV8305EVM = 47.14 A
+#define USER_ADC_FULL_SCALE_CURRENT_A (165)  // Manta100 GAIN-20V/V Rsh=1mR
 
 //! \brief Defines the current scale factor for the system
 //! \brief Compile time calculation for scale factor (ratio) used throughout the system
@@ -118,16 +118,16 @@ extern "C" {
 //! \brief ADC current offsets for A, B, and C phases
 //! \brief One-time hardware dependent, though the calibration can be done at run-time as well
 //! \brief After initial board calibration these values should be updated for your specific hardware so they are available after compile in the binary to be loaded to the controller
-#define I_A_offset (1.047175646)  //(1.226308346)  // BOOSTXL-DRV8305EVM = 1.047175646  1.210729778 1.11710757
-#define I_B_offset (1.044038892)  //(1.226440847)  // BOOSTXL-DRV8305EVM = 1.044038892  1.209441483 1.1056903
-#define I_C_offset (1.040363491)  //(1.222407222)  // BOOSTXL-DRV8305EVM = 1.040363491  1.209092796 1.097116888
+#define   I_A_offset (1.210729778)
+#define   I_B_offset (1.209441483)
+#define   I_C_offset (1.209092796)
 
 //! \brief ADC voltage offsets for A, B, and C phases
 //! \brief One-time hardware dependent, though the calibration can be done at run-time as well
 //! \brief After initial board calibration these values should be updated for your specific hardware so they are available after compile in the binary to be loaded to the controller
-#define V_A_offset (0.5072728395)  // BOOSTXL-DRV8305EVM = 0.5256254077
-#define V_B_offset (0.5071364045)  // BOOSTXL-DRV8305EVM = 0.5250559449
-#define V_C_offset (0.5085037351)  // BOOSTXL-DRV8305EVM = 0.5247237682
+#define   V_A_offset (0.5084558129)
+#define   V_B_offset (0.5074239969)
+#define   V_C_offset (0.5065535307)
 
 //! \brief CLOCKS & TIMERS
 // **************************************************************************
@@ -139,7 +139,7 @@ extern "C" {
 //! \brief For higher PWM frequencies (60 KHz+ typical for low inductance, high current ripple motors) it is recommended to use the ePWM hardware
 //! \brief and adjustable ADC SOC to decimate the ADC conversion done interrupt to the control system, or to use the software Que example.
 //! \brief Otherwise you risk missing interrupts and disrupting the timing of the control state machine
-#define USER_PWM_FREQ_kHz (30.0)  // 30.0 Example, 8.0 - 30.0 KHz typical; 45-80 KHz may be required for very low inductance, high speed motors
+#define USER_PWM_FREQ_kHz (30.0)  // for CSD88599Q5DC - max 90KHz 30.0 Example, 8.0 - 30.0 KHz typical; 45-80 KHz may be required for very low inductance, high speed motors
 
 //! \brief Defines the maximum Voltage vector (Vs) magnitude allowed.  This value sets the maximum magnitude for the output of the
 //! \brief Id and Iq PI current controllers.  The Id and Iq current controller outputs are Vd and Vq.
@@ -290,7 +290,7 @@ extern "C" {
 // **************************************************************************
 //! \brief Defines the analog voltage filter pole location, Hz
 //! \brief Must match the hardware filter for Vph
-#define USER_VOLTAGE_FILTER_POLE_Hz (344.62)  // BOOSTXL-DRV8305 = 344.62 Hz
+#define USER_VOLTAGE_FILTER_POLE_Hz (338.36)   // 6050
 
 //! \brief Defines the analog voltage filter pole location, rad/s
 //! \brief Compile time calculation from Hz to rad/s

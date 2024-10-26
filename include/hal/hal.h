@@ -70,10 +70,10 @@ extern "C" {
 //! \brief Defines LAUNCHPAD which is needed to blink LED
 #define LAUNCHPAD
 
-
+#ifdef DRV8305
 //! \brief Defines that a DRV8305 chip SPI port is used on the board.
 #define DRV8305_SPI
-
+#endif
 
 #define Device_cal (void   (*)(void))0x3D7C80
 
@@ -116,22 +116,24 @@ extern "C" {
 
 //! \brief Defines the PWM deadband falling edge delay count (system clocks)
 //!
-#define HAL_PWM_DBFED_CNT         1
+//#define HAL_PWM_DBFED_CNT         1
+#define HAL_PWM_DBFED_CNT         (uint16_t)(2.0 * (float_t)USER_SYSTEM_FREQ_MHz)            // 2 usec
 
 
 //! \brief Defines the PWM deadband rising edge delay count (system clocks)
 //!
-#define HAL_PWM_DBRED_CNT         1
+//#define HAL_PWM_DBRED_CNT         1
+#define HAL_PWM_DBRED_CNT        (uint16_t)(2.0 * (float_t)USER_SYSTEM_FREQ_MHz)            // 2 usec
 
 
 //! \brief Defines the function to turn LEDs off
 //!
-#define HAL_turnLedOff            HAL_setGpioLow
+#define HAL_turnLedOff            HAL_setGpioHigh
 
 
 //! \brief Defines the function to turn LEDs on
 //!
-#define HAL_turnLedOn             HAL_setGpioHigh
+#define HAL_turnLedOn             HAL_setGpioLow
 
 
 //! \brief Defines the function to turn LEDs on
@@ -146,7 +148,7 @@ extern "C" {
 //!
 typedef enum
 {
-  HAL_Gpio_LED2=GPIO_Number_0   //!< GPIO pin number. LaunchPad uses PWM pins for LEDs
+  HAL_Gpio_LED2=GPIO_Number_32   //!< GPIO pin number. LaunchPad uses PWM pins for LEDs
 } HAL_LedNumber_e;
   
 
@@ -278,12 +280,12 @@ extern void HAL_enableDebugInt(HAL_Handle handle);
 //! \param[in] handle  The hardware abstraction layer (HAL) handle
 extern void HAL_enableGlobalInts(HAL_Handle handle);
 
-
+#ifdef DRV8305
 //! \brief      Enables the 8305 device
 //! \details    Provides the correct timing to enable the drv8305
 //! \param[in]  handle  The hardware abstraction layer (HAL) handle
 extern void HAL_enableDrv(HAL_Handle handle);
-
+#endif
 
 //! \brief      Enables the PWM devices
 //! \details    Turns on the outputs of the EPWM peripheral which will allow 
@@ -561,6 +563,19 @@ static inline void HAL_readAdcData(HAL_Handle handle,HAL_AdcData_t *pAdcData)
   value = (_iq)ADC_readResult(obj->adcHandle,ADC_ResultNumber_7);     // divide by 2^numAdcBits = 2^12
   value = _IQ12mpy(value,voltage_sf);
   pAdcData->dcBus = value;
+  
+    // read the temperature sensor value from ADCIN_A6
+  value = (_iq)ADC_readResult(obj->adcHandle,ADC_ResultNumber_8);
+  value = _IQ12mpy(value,_IQ(3.30));              // divide by 2^numAdcBits = 2^12, 3.3V is the maximum ADC input voltage
+  value = value - _IQ(0.60);                      // 600mV Offset
+  value = _IQdiv(value,_IQ(0.01));                // 10mV/ C gain
+  pAdcData->TempSensor = value;
+
+  // read the Throttle voltage value
+  //value = (_iq)ADC_readResult(obj->adcHandle,ADC_ResultNumber_8);     // divide by 2^numAdcBits = 2^12
+  //pAdcData->Throttle = value;
+
+
 
   return;
 } // end of HAL_readAdcData() function
@@ -778,6 +793,19 @@ static inline void HAL_setGpioHigh(HAL_Handle handle,const GPIO_Number_e gpioNum
 
   return;
 } // end of HAL_setGpioHigh() function
+
+
+//! \brief      Reads the specified GPIO pin
+//! \details    Takes in the enumeration GPIO_Number_e and reads that GPIO
+//! \param[in]  handle      The hardware abstraction layer (HAL) handle
+//! \param[in]  gpioNumber  The GPIO number
+static inline bool HAL_readGpio(HAL_Handle handle,const GPIO_Number_e gpioNumber)
+{
+  HAL_Obj *obj = (HAL_Obj *)handle;
+
+  // read GPIO
+  return(GPIO_read(obj->gpioHandle,gpioNumber));
+} // end of HAL_readGpio() function
 
 
 //! \brief      Toggles the GPIO pin
@@ -1000,10 +1028,11 @@ extern void HAL_setupPwms(HAL_Handle handle,
                    const float_t pwmPeriod_usec,
                    const uint_least16_t numPwmTicksPerIsrTick);
 
-
+#ifdef DRV8305
 //! \brief     Sets up the spiA peripheral
 //! \param[in] handle   The hardware abstraction layer (HAL) handle
 extern void HAL_setupSpiA(HAL_Handle handle);
+#endif
 
 #ifdef MCP2515
 extern void HAL_setupSpi_MCP2515(HAL_Handle handle);
@@ -1058,24 +1087,41 @@ static inline void HAL_updateAdcBias(HAL_Handle handle)
 //! \brief     Writes DAC data to the PWM comparators for DAC (digital-to-analog conversion) output
 //! \param[in] handle    The hardware abstraction layer (HAL) handle
 //! \param[in] pDacData  The pointer to the DAC data
-static inline void HAL_writeDacData(HAL_Handle handle,HAL_DacData_t *pDacData)
-{
-  HAL_Obj *obj = (HAL_Obj *)handle;
-
-  // convert values from _IQ to _IQ15
-  int16_t dacValue_1 = (int16_t)_IQtoIQ15(pDacData->value[0]);
-  int16_t dacValue_2 = (int16_t)_IQtoIQ15(pDacData->value[1]);
-  int16_t dacValue_3 = (int16_t)_IQtoIQ15(pDacData->value[2]);
-  int16_t dacValue_4 = (int16_t)_IQtoIQ15(pDacData->value[3]);
-
-  // write the DAC data
-  PWMDAC_write_CmpA(obj->pwmDacHandle[PWMDAC_Number_1],dacValue_1);
-  PWMDAC_write_CmpB(obj->pwmDacHandle[PWMDAC_Number_1],dacValue_2);
-  PWMDAC_write_CmpA(obj->pwmDacHandle[PWMDAC_Number_2],dacValue_3);
-  PWMDAC_write_CmpA(obj->pwmDacHandle[PWMDAC_Number_3],dacValue_4);
-
-  return;
-} // end of HAL_writeDacData() function
+//static inline void HAL_writeDacData(HAL_Handle handle,HAL_DacData_t *pDacData)
+//{
+//  HAL_Obj *obj = (HAL_Obj *)handle;
+//
+//  // convert values from _IQ to _IQ15
+//  uint_least8_t cnt;
+//  _iq period;
+//  _iq dacData_sat_dc;
+//  _iq value;
+//  uint16_t cmpValue[4];
+//
+//  period = (_iq)pDacData->PeriodMax;
+//
+//  for(cnt=0;cnt<4;cnt++)
+//	{
+//	  dacData_sat_dc = _IQmpy(pDacData->value[cnt], pDacData->gain[cnt]) + pDacData->offset[cnt];
+//	  value = _IQmpy(dacData_sat_dc, period);
+//	  cmpValue[cnt] = (uint16_t)_IQsat(value, period, 0);
+//	}
+//
+//  // write the DAC data
+//  if(obj->pwmDacHandle[PWMDAC_Number_1])
+//  {
+//	  PWMDAC_write_CmpA(obj->pwmDacHandle[PWMDAC_Number_1], cmpValue[0]);
+//	  PWMDAC_write_CmpB(obj->pwmDacHandle[PWMDAC_Number_1], cmpValue[1]);
+//  }
+//
+//  if(obj->pwmDacHandle[PWMDAC_Number_2])
+//  {
+//	  PWMDAC_write_CmpA(obj->pwmDacHandle[PWMDAC_Number_2], cmpValue[2]);
+//	  PWMDAC_write_CmpB(obj->pwmDacHandle[PWMDAC_Number_2], cmpValue[3]);
+//  }
+//
+//  return;
+//} // end of HAL_writeDacData() function
 
 
 //! \brief     Writes PWM data to the PWM comparators for motor control
@@ -1179,7 +1225,12 @@ static inline uint16_t HAL_readPwmPeriod(HAL_Handle handle,const PWM_Number_e pw
 } // end of HAL_readPwmPeriod() function
 
 
-static inline void HAL_setTrigger(HAL_Handle handle,const SVGENCURRENT_IgnoreShunt_e ignoreShunt,const int16_t minwidth, const int16_t cmpOffset)
+//! \brief     Set trigger point in the middle of the low side pulse
+//! \param[in] handle    The hardware abstraction layer (HAL) handle
+//! \param[in] ignoreShunt  The low side shunt that should be ignored
+//! \param[in] midVolShunt  The middle length of output voltage
+static inline void HAL_setTrigger(HAL_Handle handle,const SVGENCURRENT_IgnoreShunt_e ignoreShunt,
+									const SVGENCURRENT_VmidShunt_e midVolShunt)
 {
   HAL_Obj *obj = (HAL_Obj *)handle;
 
@@ -1194,8 +1245,6 @@ static inline void HAL_setTrigger(HAL_Handle handle,const SVGENCURRENT_IgnoreShu
   uint16_t pwmCMPA1 = pwm1->CMPA;
   uint16_t pwmCMPA2 = pwm2->CMPA;
   uint16_t pwmCMPA3 = pwm3->CMPA;
-
-  int16_t offset;
 
   if(ignoreShunt == use_all)
     {
@@ -1212,74 +1261,55 @@ static inline void HAL_setTrigger(HAL_Handle handle,const SVGENCURRENT_IgnoreShu
           pwm = pwm3;
         }
     }
-  else if(ignoreShunt == ignore_a)
-    {
-      offset = pwmCMPA1 + cmpOffset;
-    }
-  else if(ignoreShunt == ignore_b)
-    {
-      offset = pwmCMPA2 + cmpOffset;
-    }
-  else if(ignoreShunt == ignore_c)
-    {
-      offset = pwmCMPA3 + cmpOffset;
-    }
-  else if(ignoreShunt == ignore_ab)
-    {
-      if(pwmCMPA1 > pwmCMPA2)
-        {
-          offset = pwmCMPA1 + cmpOffset;
-        }
-      else
-        {
-          offset = pwmCMPA2 + cmpOffset;
-        }
-    }
-  else if(ignoreShunt == ignore_ac)
-    {
-      if(pwmCMPA1 > pwmCMPA3)
-        {
-          offset = pwmCMPA1 + cmpOffset;
-        }
-      else
-        {
-          offset = pwmCMPA3 + cmpOffset;
-        }
-    }
-  else // when ignoreShunt == ignore_bc
-    {
-      if(pwmCMPA2 > pwmCMPA3)
-        {
-          offset = pwmCMPA2 + cmpOffset;
-        }
-      else
-        {
-          offset = pwmCMPA3 + cmpOffset;
-        }
-    }
-
-
-  if(ignoreShunt == use_all)
-    {
-      if(pwm->CMPAM >= (pwm->CMPA + pwm->DBFED))
-        {
-          pwm1->CMPB = (pwm->CMPAM - (pwm->CMPA + pwm->DBFED)) / 2 + 1;
-          PWM_setSocAPulseSrc(obj->pwmHandle[PWM_Number_1],PWM_SocPulseSrc_CounterEqualCmpBDecr);
-        }
-      else
-        {
-          pwm1->CMPB = ((pwm->CMPA + pwm->DBFED) - pwm->CMPAM ) / 2 + 1;
-          PWM_setSocAPulseSrc(obj->pwmHandle[PWM_Number_1],PWM_SocPulseSrc_CounterEqualCmpBIncr);
-        }
-    }
   else
-    {
-      pwm1->CMPB = offset;
-      PWM_setSocAPulseSrc(obj->pwmHandle[PWM_Number_1],PWM_SocPulseSrc_CounterEqualCmpBIncr);
-    }
+  {
+	  if(midVolShunt == Vmid_a)
+	  {
+		  pwm = pwm1;
+	  }
+	  else if(midVolShunt == Vmid_b)
+	  {
+		  pwm = pwm2;
+	  }
+	  else
+	  {
+		  pwm = pwm3;
+	  }
+  }
+
+  pwmCMPA1 = pwm->CMPA;
+  pwmCMPA2 = pwm->CMPAM;
+
+  if(pwmCMPA2 >= (pwmCMPA1 + pwm->DBFED))
+  {
+	  pwmCMPA3 = (pwmCMPA2 - (pwmCMPA1 + pwm->DBFED)) / 2 + 1;
+	  if(pwmCMPA3 < (pwm1->TBPRD>>1))
+	  {
+		  pwm1->CMPB = pwmCMPA3;
+	  }
+	  else
+	  {
+		  pwm1->CMPB = (pwm1->TBPRD>>1);
+	  }
+	  PWM_setSocAPulseSrc(obj->pwmHandle[PWM_Number_1],PWM_SocPulseSrc_CounterEqualCmpBDecr);
+  }
+  else
+  {
+	  pwmCMPA3 = ((pwmCMPA1 + pwm->DBFED) - pwmCMPA2 ) / 2 + 1;
+	  if(pwmCMPA3 < (pwm1->TBPRD>>1))
+	  {
+		  pwm1->CMPB = pwmCMPA3;
+	  }
+	  else
+	  {
+		  pwm1->CMPB = (pwm1->TBPRD>>1);
+	  }
+	  PWM_setSocAPulseSrc(obj->pwmHandle[PWM_Number_1],PWM_SocPulseSrc_CounterEqualCmpBIncr);
+  }
 
   return;
 } // end of HAL_setTrigger() function
+
 
 //! \brief     Selects the analog channel used for calibration
 //! \param[in] handle      The hardware abstraction layer (HAL) handle
@@ -1329,6 +1359,7 @@ void HAL_setupSCI(HAL_Handle handle);
 extern void HAL_setupCAP(HAL_Handle handle); // Added by Dmitri
 #endif
 
+#ifdef DRV8305
 //! \brief     Writes data to the driver
 //! \param[in] handle         The hardware abstraction layer (HAL) handle
 //! \param[in] Spi_8305_Vars  SPI variables
@@ -1346,7 +1377,9 @@ void HAL_readDrvData(HAL_Handle handle, DRV_SPI_8305_Vars_t *Spi_8305_Vars);
 //! \param[in] Spi_8305_Vars  SPI variables
 void HAL_setupDrvSpi(HAL_Handle handle, DRV_SPI_8305_Vars_t *Spi_8305_Vars);
 
+
 void HAL_Spi_SW_DRV8305(HAL_Handle handle);
+#endif
 #ifdef MCP2515
 void HAL_Spi_SW_MCP2515(HAL_Handle handle);
 #endif

@@ -1,0 +1,8 @@
+# Run manually to reformat a file:
+# clang-format -i --style=file <file>
+BasedOnStyle: Google
+IndentWidth: 4
+TabWidth: 4
+SortIncludes: false
+UseTab: Never
+ColumnLimit: 0

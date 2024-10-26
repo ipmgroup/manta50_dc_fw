@@ -198,6 +198,8 @@ typedef struct _MOTOR_Vars_t_ {
     MATH_vec3 I_bias;
     MATH_vec3 V_bias;
 
+    _iq TempSenDegCelsius;
+
 } MOTOR_Vars_t;
 
 typedef struct esc_state {
@@ -367,7 +369,7 @@ int resetMcp();
 int calcAvgCurrent();
 int measureTemperatureC();
 void copyMotorParams();
-int resetDevice();
+void resetDevice();
 
 //@} //defgroup
 #endif  // end of _MAIN_H_ definition

@@ -58,10 +58,13 @@
 
 #include "sw/drivers/timer/src/32b/f28x/f2802x/timer.h"
 #include "sw/drivers/wdog/src/32b/f28x/f2802x/wdog.h"
+
+#ifdef DRV8305
 #ifdef CS_GPIO
 #include "drv8305.h"
 #else
 #include "sw/drivers/drvic/drv8305/src/32b/f28x/f2802x/drv8305.h"
+#endif
 #endif
 
 #ifdef SCI
@@ -105,7 +108,11 @@ typedef struct _HAL_AdcData_t_
 
   _iq       dcBus;      //!< the dcBus value
 
-} HAL_AdcData_t;
+  _iq		TempSensor;	//!< the ADC-Data for the Temperature Sensor
+
+  //_iq       Throttle;   //!< the Throttle value
+  
+  } HAL_AdcData_t;
 
 
 //! \brief      Defines the DAC data
@@ -187,9 +194,10 @@ typedef struct _HAL_Obj_
 #endif
   SPI_Handle    spiAHandle;       //!< the SPIA handle
   SPI_Obj       spiA;             //!< the SPIA object
-
+#ifdef DRV8305
   DRV8305_Handle drv8305Handle;   //!< the drv8305 interface handle
   DRV8305_Obj    drv8305;         //!< the drv8305 interface object
+#endif
 #ifdef MCP2515
   MCP2515_Handle mcp2515Handle;   //!< the MCP2515 interface handle
   MCP2515_Obj    mcp2515;         //!< the MCP2515 interface object

@@ -31,7 +31,7 @@ extern uint16_t fault[4];
 
 #define APP_VERSION_MAJOR 1
 #define APP_VERSION_MINOR 0
-#define APP_NODE_NAME "org.ipm.manta50"
+#define APP_NODE_NAME "org.ipm.manta100"
 #define UNIQUE_ID_LENGTH_BYTES 16
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -369,7 +369,9 @@ static void SaveProfile(void) {
     HAL_setupSpi_25AA02(halHandle);
     int pn = (int)EEPROM_getTargetProfile(halHandle);
     EEPROM_saveProfile(halHandle, pn, &gUserParams, &gMotorVars, &settings);
+#ifdef DRV8301_SPI
     HAL_setupSpiA(halHandle);
+#endif
 }
 
 static void SaveAndResetFlags() {
@@ -410,7 +412,9 @@ static void handle_param_ExecuteOpcode(CanardInstance *ins, CanardRxTransfer *tr
         // here is where you would reset all parameters to defaults
         HAL_setupSpi_25AA02(halHandle);
         EEPROM_clear(halHandle);
+#ifdef DRV8301_SPI
         HAL_setupSpiA(halHandle);
+#endif
     }
     if (req.opcode == UAVCAN_PROTOCOL_PARAM_EXECUTEOPCODE_REQUEST_OPCODE_SAVE) {
         // here is where you would save all the changed parameters to permanent storage
@@ -680,7 +684,9 @@ void processTxRxOnce(int timeout_msec) {
             setRcvFlag(halHandle->mcp2515Handle, 1);
         }
     }
+#ifdef DRV8301_SPI
     HAL_setupSpiA(halHandle);
+#endif
 }
 
 void sendUpdateIfChanged(uint8_t currentValue, uint8_t *previousValue, const char *prefix, char *buffer_str, size_t buffer_size) {

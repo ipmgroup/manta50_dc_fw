@@ -14,7 +14,6 @@
 // #pragma DATA_SECTION(prof_buf, "rom_accessed_data");
 // #endif
 
-
 void EEPROM_init_pm(HAL_Handle halHandle) {
     HAL_setupEEPROM25AA02(halHandle);
 }
@@ -27,8 +26,11 @@ void EEPROM_disableWP(HAL_Handle halHandle) {
     // Enable  write protection on 0x80 - 0xFF:     0x08.
     // Enable  write protection on the whole array: 0x0C.
     EEPROM25AA02_writeStatus(halHandle->eeprom25aa02Handle, 0x00);
-
+#ifdef DRV8301_SPI
     HAL_setupSpiA(halHandle);
+#else
+    HAL_setupSpi_MCP2515(halHandle);
+#endif
 }
 
 void EEPROM_enableWP(HAL_Handle halHandle) {
@@ -39,20 +41,31 @@ void EEPROM_enableWP(HAL_Handle halHandle) {
     // Enable  write protection on 0x80 - 0xFF:     0x08.
     // Enable  write protection on the whole array: 0x0C.
     EEPROM25AA02_writeStatus(halHandle->eeprom25aa02Handle, 0x0C);
-
+#ifdef DRV8301_SPI
     HAL_setupSpiA(halHandle);
+#else
+    HAL_setupSpi_MCP2515(halHandle);
+#endif
 }
 
 void EEPROM_save(HAL_Handle halHandle, uint16_t addr, uint_least8_t *data, int len) {
     HAL_setupSpi_25AA02(halHandle);
     EEPROM25AA02_writeRegisterN(halHandle->eeprom25aa02Handle, addr, data, len);
+#ifdef DRV8301_SPI
     HAL_setupSpiA(halHandle);
+#else
+    HAL_setupSpi_MCP2515(halHandle);
+#endif
 }
 
 void EEPROM_read(HAL_Handle halHandle, uint16_t addr, uint_least8_t *buf, int len) {
     HAL_setupSpi_25AA02(halHandle);
     EEPROM25AA02_readRegisterN(halHandle->eeprom25aa02Handle, addr, buf, len);
+#ifdef DRV8301_SPI
     HAL_setupSpiA(halHandle);
+#else
+    HAL_setupSpi_MCP2515(halHandle);
+#endif
 }
 
 uint32_t EEPROM_getVerificationNumber(HAL_Handle halHandle) {
@@ -136,10 +149,10 @@ int EEPROM_loadProfile(HAL_Handle halHandle, int pn, USER_Params *u_params, MOTO
     }
 
     // Unpacking settings data
-    settings->can_node = buf[0];       // 1 byte for CAN node
-    settings->esc_index = buf[1];      // 1 byte for ESC index
-    settings->telem_rate = buf[2];     // 1 byte for telemetry rate
-    settings->can_speed = buf[3];      // 1 byte for CAN speed
+    settings->can_node = buf[0];    // 1 byte for CAN node
+    settings->esc_index = buf[1];   // 1 byte for ESC index
+    settings->telem_rate = buf[2];  // 1 byte for telemetry rate
+    settings->can_speed = buf[3];   // 1 byte for CAN speed
     UNPACK_32BIT_FROM_BUF(settings->midle_point, buf, 4);
     settings->controll_word = buf[8];  // 1 byte for control word
 
@@ -147,7 +160,7 @@ int EEPROM_loadProfile(HAL_Handle halHandle, int pn, USER_Params *u_params, MOTO
     u_params->motor_type = buf[9];  // 1 byte for motor type
 
     // Unpacking 32-bit settings values using the macro
-    UNPACK_32BIT_FROM_BUF(settings->max_speed, buf, 10);      // 4 bytes for max speed
+    UNPACK_32BIT_FROM_BUF(settings->max_speed, buf, 10);     // 4 bytes for max speed
     UNPACK_32BIT_FROM_BUF(settings->acseleration, buf, 14);  // 4 bytes for acceleration
     UNPACK_32BIT_FROM_BUF(settings->motor_poles, buf, 18);   // 4 bytes for motor poles
     UNPACK_32BIT_FROM_BUF(settings->Kp, buf, 22);            // 4 bytes for Kp parameter
@@ -187,7 +200,6 @@ int EEPROM_loadProfile(HAL_Handle halHandle, int pn, USER_Params *u_params, MOTO
     return 0;
 }
 
-
 int EEPROM_saveProfile(HAL_Handle halHandle, int pn, USER_Params *u_params, MOTOR_Vars_t *m_params, settings_t *settings) {
     // Check if the profile number is within the valid range
     if (pn < 0 || pn >= EEPROM_PROFILE_COUNT) {
@@ -198,24 +210,24 @@ int EEPROM_saveProfile(HAL_Handle halHandle, int pn, USER_Params *u_params, MOTO
     uint_least8_t buf[EEPROM_PROFILE_SIZE * EEPROM_BLOCK_SIZE] = {0};
 
     // Packing settings data
-    buf[0] = (uint_least8_t)settings->can_node;       // 1 byte for CAN node
-    buf[1] = (uint_least8_t)settings->esc_index;      // 1 byte for ESC index
-    buf[2] = (uint_least8_t)settings->telem_rate;     // 1 byte for telemetry rate
-    buf[3] = (uint_least8_t)settings->can_speed;      // 1 byte for CAN speed
+    buf[0] = (uint_least8_t)settings->can_node;    // 1 byte for CAN node
+    buf[1] = (uint_least8_t)settings->esc_index;   // 1 byte for ESC index
+    buf[2] = (uint_least8_t)settings->telem_rate;  // 1 byte for telemetry rate
+    buf[3] = (uint_least8_t)settings->can_speed;   // 1 byte for CAN speed
 
     // Packing 32-bit values (assumed to be important settings)
     PACK_32BIT(*((uint32_t *)&settings->midle_point), buf, 4);  // 4 bytes for midle point
-    buf[8] = (uint_least8_t)settings->controll_word;  // 1 byte for control word
+    buf[8] = (uint_least8_t)settings->controll_word;            // 1 byte for control word
 
     // Packing motor type
     buf[9] = u_params->motor_type;  // 1 byte for motor type
 
     // Packing 32-bit settings values
-    PACK_32BIT(*((uint32_t *)&settings->max_speed), buf, 10);      // 4 bytes for max speed
-    PACK_32BIT(*((uint32_t *)&settings->acseleration), buf, 14);   // 4 bytes for acceleration
-    PACK_32BIT(*((uint32_t *)&settings->motor_poles), buf, 18);    // 4 bytes for motor poles
-    PACK_32BIT(*((uint32_t *)&settings->Kp), buf, 22);              // 4 bytes for Kp parameter
-    PACK_32BIT(*((uint32_t *)&settings->Ki), buf, 26);              // 4 bytes for Ki parameter
+    PACK_32BIT(*((uint32_t *)&settings->max_speed), buf, 10);     // 4 bytes for max speed
+    PACK_32BIT(*((uint32_t *)&settings->acseleration), buf, 14);  // 4 bytes for acceleration
+    PACK_32BIT(*((uint32_t *)&settings->motor_poles), buf, 18);   // 4 bytes for motor poles
+    PACK_32BIT(*((uint32_t *)&settings->Kp), buf, 22);            // 4 bytes for Kp parameter
+    PACK_32BIT(*((uint32_t *)&settings->Ki), buf, 26);            // 4 bytes for Ki parameter
 
     // Packing 16-bit value for number of pole pairs
     PACK_16BIT(u_params->motor_numPolePairs, buf, 30);  // 2 bytes for number of pole pairs
@@ -235,9 +247,9 @@ int EEPROM_saveProfile(HAL_Handle halHandle, int pn, USER_Params *u_params, MOTO
     // Packing speed control parameters as 32-bit integers
     uint32_t tmp;
     tmp = (uint32_t)(_IQtoF(m_params->Kp_spd));  // Convert Kp_spd to uint32_t
-    PACK_32BIT(tmp, buf, 72);                     // 4 bytes for Kp speed
+    PACK_32BIT(tmp, buf, 72);                    // 4 bytes for Kp speed
     tmp = (uint32_t)(_IQtoF(m_params->Ki_spd));  // Convert Ki_spd to uint32_t
-    PACK_32BIT(tmp, buf, 76);                     // 4 bytes for Ki speed
+    PACK_32BIT(tmp, buf, 76);                    // 4 bytes for Ki speed
 
     // Calculate the start address for the requested profile
     uint16_t startAddress = (EEPROM_PROFILE_SIZE * pn + EEPROM_PROFILE_START_BLOCK) * EEPROM_BLOCK_SIZE;
@@ -251,7 +263,6 @@ int EEPROM_saveProfile(HAL_Handle halHandle, int pn, USER_Params *u_params, MOTO
     }
     return 0;
 }
-
 
 void EEPROM_initMem(HAL_Handle halHandle, USER_Params *u_params, MOTOR_Vars_t *m_params, settings_t *settings) {
     int i = 0;

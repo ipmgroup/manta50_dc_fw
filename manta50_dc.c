@@ -41,12 +41,17 @@
 //!
 // **************************************************************************
 
-#include <math.h>
 #include "main.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <math.h>
+
+#ifdef THROTTLE
+#include "throttle.h"
+#endif
 #include "ADC_temp.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #ifdef EEPROM_25AA02
 #include "eeprom-pm.h"
 #endif
@@ -57,13 +62,14 @@
 
 #include "dronecan.h"
 
-
 #define CURRENT_BUF_LEN 16
 #define CURRENT_ADJUSTMENT_INTERCEPT 0
 #define CURRENT_ADJUSTMENT_SLOPE 1
 
 #define LED_BLINK_FREQ_Hz 5
+#ifdef nFault
 #define nFault_FREQ_Hz 1
+#endif
 
 int resetTrigger = 0;
 uint8_t error = 0;
@@ -82,6 +88,9 @@ uint16_t peak_percent = 0;
 
 uint16_t gLEDcnt = 0;
 
+// int currentBuf[CURRENT_BUF_LEN] = {0};
+// uint8_t cPos = 0;
+
 bool Flag_Latch_Save = false;
 bool Flag_Update_Settings = false;
 bool Flag_Arming = false;
@@ -92,7 +101,6 @@ uint32_t mcpResetCounter = 0;
 
 bool Flag_nFault = 0;
 bool Flag_nFaultDroneCan = 0;
-uint16_t gFaultcnt = 0;
 uint16_t ReadOnFaultCnt = 0;
 
 uint16_t fault[4] = {0};
@@ -129,8 +137,8 @@ CTRL_Obj *controller_obj;
 CTRL_Obj ctrl;  // v1p7 format
 #endif
 
-//volatile MOTOR_Vars_t gMotorVars = MOTOR_Vars_INIT;
-//volatile uint8_t isr_status = 0;
+// volatile MOTOR_Vars_t gMotorVars = MOTOR_Vars_INIT;
+// volatile uint8_t isr_status = 0;
 MOTOR_Vars_t gMotorVars = MOTOR_Vars_INIT;
 uint8_t isr_status = 0;
 
@@ -160,6 +168,18 @@ DRV_SPI_8301_Vars_t gDrvSpi8301Vars;
 DRV_SPI_8305_Vars_t gDrvSpi8305Vars;
 #endif
 
+#ifdef THROTTLE
+// define throttle
+THROTTLE_Obj throttle;           //!< the throttle input to deal with the potentiometer input
+THROTTLE_Handle throttleHandle;  //!< the trhottle input handle
+#endif
+
+#ifdef CPU_USAGE
+// define CPU time
+CPU_TIME_Handle cpu_timeHandle;
+CPU_TIME_Obj cpu_time;
+#endif
+
 _iq gFlux_pu_to_Wb_sf;
 
 _iq gFlux_pu_to_VpHz_sf;
@@ -167,6 +187,14 @@ _iq gFlux_pu_to_VpHz_sf;
 _iq gTorque_Ls_Id_Iq_pu_to_Nm_sf;
 
 _iq gTorque_Flux_Iq_pu_to_Nm_sf;
+
+int isr_failsafe_count = 0;
+char devId = '0';
+bool failsafe = 1;
+
+#ifdef nFault
+uint16_t gFaultcnt = 0;
+#endif
 
 // **************************************************************************
 // the functions
@@ -193,13 +221,28 @@ int measureTemperatureC() {
     return (int)ADC_getTemperatureC(halHandle->adcHandle, temp);
 }
 
+// int calcAvgCurrent() {
+//     long currentValue = 0;
+
+//     int i = 0;
+//     for (i = 0; i < CURRENT_BUF_LEN; i++) {
+//         currentValue += currentBuf[i];  // * current[i];
+//     }
+//     currentValue = currentValue / CURRENT_BUF_LEN;
+//     return (int)currentValue;
+// }
+
 int calcHumidity() {
+#ifdef DRV8301_SPI
     uint16_t raw = ADC_readResult(halHandle->adcHandle, ADC_ResultNumber_8);  // 3.3v = 4095
     float V = (3.300 / 4096.0 * raw);
 
     int tempC = measureTemperatureC();
     float humidity = -23.82075472 + 47.64627406 * V;
     humidity = humidity / (1.0546 - 0.00216 * tempC);  // adjusted for temperature
+                                                       // sprintf(dataBuffer, "%d", (int)humidity);
+#endif
+    _iq humidity = gMotorVars.TempSenDegCelsius;
     return (int)humidity;
 }
 
@@ -209,7 +252,15 @@ int initReset() {
     return 0;
 }
 
-int resetDevice() {
+// int resetDevice(){
+void resetDevice() {
+#ifdef DEBUG
+    int i;
+    for (i = 1; i < 12; ++i) {
+        syncTimes[i - 1] = syncTimes[i] - syncTimes[i - 1];
+    }
+#endif
+
     // gMotorVars.Flag_enableSys = 0; // Disable system if reset is requested.
     MCP2515_reset(halHandle->mcp2515Handle);
 
@@ -224,16 +275,20 @@ int resetDevice() {
 
     while (1) {
     }
+
+    //	return 0;
 }
 
 int resetMcp() {
+#ifdef DEBUG
     mcpResetCounter++;
-
+#endif
     HAL_setupSpi_MCP2515(halHandle);
     MCP2515_reset(halHandle->mcp2515Handle);
     configMCP2515((uint8_t)settings.can_speed);
+#ifdef DRV8301_SPI
     HAL_setupSpiA(halHandle);
-
+#endif
     resetMcpTrigger = 0;
 
     return 0;
@@ -319,6 +374,21 @@ void main(void) {
     // set the default controller parameters
     CTRL_setParams(ctrlHandle, &gUserParams);
 
+#ifdef THROTTLE
+    throttleHandle = THROTTLE_init(&throttle, sizeof(throttle));
+    THROTTLE_setParams(throttleHandle,
+                       _IQ(0.828613281),
+                       _IQ(0.162597656),
+                       _IQ(gUserParams.maxCurrent / USER_IQ_FULL_SCALE_CURRENT_A),
+                       _IQ(0.0));
+#endif
+
+#ifdef CPU_USAGE
+    // initialize the CPU usage module
+    cpu_timeHandle = CPU_TIME_init(&cpu_time, sizeof(cpu_time));
+    CPU_TIME_setParams(cpu_timeHandle, PWM_getPeriod(halHandle->pwmHandle[0]));
+#endif
+
     // Initialize field weakening
     fwHandle = FW_init(&fw, sizeof(fw));
 
@@ -339,6 +409,7 @@ void main(void) {
 
     // Set the field weakening controller limits
     FW_setMinMax(fwHandle, _IQ(USER_MAX_NEGATIVE_ID_REF_CURRENT_A / USER_IQ_FULL_SCALE_CURRENT_A), _IQ(0.0));
+    // FW_setMinMax(fwHandle, _IQ(gUserParams.maxNegativeIdCurrent_a / gUserParams.iqFullScaleCurrent_A), _IQ(0.0));
 
     // setup faults
     HAL_setupFaults(halHandle);
@@ -357,6 +428,8 @@ void main(void) {
 
     // disable the PWM
     HAL_disablePwm(halHandle);
+
+    HAL_setGpioHigh(halHandle, GPIO_Number_34);
 
 #ifdef DRV8301_SPI
     // turn on the DRV8301 if present
@@ -393,7 +466,9 @@ void main(void) {
 #ifdef MCP2515
     HAL_setupSpi_MCP2515(halHandle);
     configMCP2515((uint8_t)settings.can_speed);
+#ifdef DRV8301_SPI
     HAL_setupSpiA(halHandle);
+#endif
 #endif
 
     canard_init();
@@ -417,6 +492,11 @@ void main(void) {
 
         // loop while the enable system flag is true
         while (gMotorVars.Flag_enableSys) {
+            // do the overtemperature check
+            if (_IQtoF(gMotorVars.TempSenDegCelsius) > 100.0) {
+                gMotorVars.Flag_Run_Identify = false;
+            }
+
             if (resetMcpTrigger) {
                 resetMcp();
             }
@@ -552,6 +632,16 @@ void main(void) {
                 updateGlobalVariables_motor(ctrlHandle);
             }
 
+#ifdef THROTTLE
+            {
+                THROTTLE_setup(throttleHandle,
+                               gAdcData.Throttle,
+                               false,
+                               false);
+                THROTTLE_runState(throttleHandle);
+            }
+#endif
+
             // update Kp and Ki gains
             updateKpKiGains(ctrlHandle);
 
@@ -573,6 +663,7 @@ void main(void) {
 
             if (Flag_nFault) {
                 ReadOnFault();
+
                 Flag_nFault = 0;
             }
 
@@ -606,7 +697,7 @@ interrupt void mainISR(void) {
     }
 
     canInactivityCounter++;
-    //    If MCP reset frequency is greater than 0, activate it.
+    // If MCP reset frequency is greater than 0, activate it.
     if (mcpInactivityResetFreq > 0) {
         uint_least32_t mcpResetCycle = (uint_least32_t)(((float)USER_ISR_FREQ_Hz) / ((float)mcpInactivityResetFreq));  // Number of the cycle at which the MCP has to be reset.
         if (((canInactivityCounter % mcpResetCycle) + 1) >= mcpResetCycle && resetMcpTrigger == 0) {                   // Increase counter, and if it's time, set flag to reset MCP.
@@ -700,21 +791,41 @@ void updateGlobalVariables_motor(CTRL_Handle handle) {
     gMotorVars.Vq = CTRL_getVq_out_pu(ctrlHandle);
 
     // calculate vector Vs in per units
-    gMotorVars.Vs = _IQsqrt(_IQmpy(gMotorVars.Vd, gMotorVars.Vd) + _IQmpy(gMotorVars.Vq, gMotorVars.Vq));
+#ifdef VI_ORG
+    // gMotorVars.Vs = _IQsqrt(_IQmpy(gMotorVars.Vd, gMotorVars.Vd) + _IQmpy(gMotorVars.Vq, gMotorVars.Vq));
+#else
+    float Vd_V = _IQtoF(gMotorVars.Vd);
+    float Vq_V = _IQtoF(gMotorVars.Vq);
+    float Vs_V = sqrt((Vd_V * Vd_V) + (Vq_V * Vq_V));
+    gMotorVars.Vs = _IQ(Vs_V);
+#endif
 
     // read Id and Iq vectors in amps
     gMotorVars.Id_A = _IQmpy(CTRL_getId_in_pu(ctrlHandle), _IQ(USER_IQ_FULL_SCALE_CURRENT_A));
     gMotorVars.Iq_A = _IQmpy(CTRL_getIq_in_pu(ctrlHandle), _IQ(USER_IQ_FULL_SCALE_CURRENT_A));
 
+    // calculate vector Is in amps
+#ifdef VI_ORG
+    gMotorVars.Is_A = _IQsqrt(_IQmpy(gMotorVars.Id_A, gMotorVars.Id_A) + _IQmpy(gMotorVars.Iq_A, gMotorVars.Iq_A));
+#else
     float Id_A = _IQtoF(gMotorVars.Id_A);
     float Iq_A = _IQtoF(gMotorVars.Iq_A);
     float Is_A = sqrt((Id_A * Id_A) + (Iq_A * Iq_A));
-
-    // calculate vector Is in amps
-    gMotorVars.Is_A = _IQ(Is_A);  //_IQsqrt(_IQmpy(gMotorVars.Id_A, gMotorVars.Id_A) + _IQmpy(gMotorVars.Iq_A, gMotorVars.Iq_A));
+    gMotorVars.Is_A = _IQ(Is_A);
+#endif
 
     // Get the DC buss voltage
     gMotorVars.VdcBus_kV = _IQmpy(gAdcData.dcBus, _IQ(USER_IQ_FULL_SCALE_VOLTAGE_V / 1000.0));
+
+    gMotorVars.TempSenDegCelsius = gAdcData.TempSensor;
+
+    // float Ifloat = (_IQtoF(gMotorVars.Is_A) / ((float)1.414214));
+    // currentBuf[cPos] = (int)(CURRENT_ADJUSTMENT_INTERCEPT + CURRENT_ADJUSTMENT_SLOPE * (Ifloat * 1000.0));
+    // if (cPos < CURRENT_BUF_LEN - 1) {
+    //     cPos++;
+    // } else {
+    //     cPos = 0;
+    // }
 
     return;
 }  // end of updateGlobalVariables_motor() function
@@ -745,13 +856,14 @@ __interrupt void MCP2515_rcvISR(void) {
     // PIE_clearInt(obj->pieHandle, PIE_GroupNumber_1);
 }
 #endif
-
+#ifdef DRV8301_SPI
 void getStatRegData() {
     fault[0] = DRV8305_readSpi(halHandle->drv8305Handle, Address_Status_1);
     fault[1] = DRV8305_readSpi(halHandle->drv8305Handle, Address_Status_2);
     fault[2] = DRV8305_readSpi(halHandle->drv8305Handle, Address_Status_3);
     fault[3] = DRV8305_readSpi(halHandle->drv8305Handle, Address_Status_4);
 }
+
 
 void ReadOnFault() {
     if (DRV8305_isFault(halHandle->drv8305Handle)) {
@@ -765,6 +877,7 @@ void ReadOnFault() {
         gDrvSpi8305Vars.ManWriteCmd = true;
     }
 }
+#endif
 
 #ifdef MCP2515
 void configMCP2515(uint8_t can_speed) {
@@ -813,8 +926,10 @@ float updateControlWord(MOTOR_Vars_t *motorVars) {
     return (float)control_word;  // Convert to float before returning
 }
 
-void extractFlagsFromControlWord(settings_t *settings, MOTOR_Vars_t *gMotorVars) {
-    uint32_t int_control_word = (uint32_t)settings->controll_word;  // Convert float back to uint_least8_t
+void extractFlagsFromControlWord(settings_t *settings,
+                                 MOTOR_Vars_t *gMotorVars) {
+    uint32_t int_control_word =
+        (uint32_t)settings->controll_word;  // Convert float back to uint_least8_t
 
     gMotorVars->Flag_enableSys = (int_control_word & 0x01);
     gMotorVars->Flag_Run_Identify = (int_control_word >> 1) & 0x01;
@@ -825,7 +940,8 @@ void extractFlagsFromControlWord(settings_t *settings, MOTOR_Vars_t *gMotorVars)
     gMotorVars->Flag_enableUserParams = (int_control_word >> 6) & 0x01;
 }
 
-void MotorVarsToSettings(MOTOR_Vars_t *motorVars, settings_t *settings, USER_Params *UserParams) {
+void MotorVarsToSettings(MOTOR_Vars_t *motorVars, settings_t *settings,
+                         USER_Params *UserParams) {
     settings->acseleration = _IQtoF(motorVars->MaxAccel_krpmps);
     settings->Kp = _IQtoF(motorVars->Kp_spd);
     settings->Ki = _IQtoF(motorVars->Ki_spd);
@@ -836,7 +952,8 @@ void MotorVarsToSettings(MOTOR_Vars_t *motorVars, settings_t *settings, USER_Par
     settings->fluxEstFreq_Hz = UserParams->fluxEstFreq_Hz;
 }
 
-void SettingsToMotorVars(settings_t *settings, MOTOR_Vars_t *motorVars, USER_Params *UserParams) {
+void SettingsToMotorVars(settings_t *settings, MOTOR_Vars_t *motorVars,
+                         USER_Params *UserParams) {
     motorVars->MaxAccel_krpmps = _IQ(settings->acseleration);
     motorVars->Kp_spd = _IQ(settings->Kp);
     motorVars->Ki_spd = _IQ(settings->Ki);
