@@ -1,7 +1,7 @@
 # Manta 50 Motor Controller: A Universal Solution for Drones and Underwater Vehicles.
 The Manta 50 motor controller is an advanced device for controlling brushless DC motors (BLDC), designed using the InstaSPIN library from Texas Instruments. This controller offers flexibility and high precision, making it suitable for a wide range of applications, including surface and underwater vehicles, as well as flying drones. With the ability to fine-tune settings and support for modern communication protocols, the Manta 50 has proven to be a versatile solution for stabilizing and controlling various robotic platforms.
 
-# Key Features
+# Key Features.
 * Maximum Current: 47 A peak (approximately 17 A RMS), providing enough power for a wide range of motors.
 * Voltage Range: Supports power supply from 3S to 7S batteries (LiPo), making it compatible with various power sources.
 * Operating Speed Range: Ensures stable performance at low speeds, starting from 30-50 RPM, which is especially important for precise control in surface and underwater vehicles.
