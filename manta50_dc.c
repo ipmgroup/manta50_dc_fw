@@ -99,9 +99,11 @@ int16_t RAWcmd = 0;
 uint64_t lastNonZeroRAWcmdTime = 0;
 uint32_t mcpResetCounter = 0;
 
+#ifdef DRV8305_SPI
 bool Flag_nFault = 0;
 bool Flag_nFaultDroneCan = 0;
 uint16_t ReadOnFaultCnt = 0;
+#endif
 
 uint16_t fault[4] = {0};
 #ifdef F2802xF
@@ -691,10 +693,14 @@ interrupt void mainISR(void) {
         gLEDcnt = 0;
     }
 
+#ifdef DRV8305_SPI
     if (gFaultcnt++ > (uint_least32_t)(USER_ISR_FREQ_Hz / nFault_FREQ_Hz)) {
         Flag_nFault = 1;
         gFaultcnt = 0;
     }
+#endif
+
+    // increment the counter
 
     canInactivityCounter++;
     // If MCP reset frequency is greater than 0, activate it.

@@ -26,8 +26,10 @@ extern uint64_t lastNonZeroRAWcmdTime;
 // extern uint32_t DroneCanActivityCounter;
 // extern uint32_t previousDroneCanActivityCounter;
 extern uint8_t error;
+#ifdef DRV8305_SPI
 extern bool Flag_nFaultDroneCan;
 extern uint16_t fault[4];
+#endif
 
 #define APP_VERSION_MAJOR 1
 #define APP_VERSION_MINOR 0
@@ -490,7 +492,7 @@ void createStringFromParameter(const struct parameter *p, char *buffer, size_t b
             buffer[buffer_size - 1] = '\0';
 
             buffer[name_len] = ' ';
-             floatToStringInBuffer(buffer + name_len + 1, buffer_size - name_len - 1, *p->value, p->decimal);
+            floatToStringInBuffer(buffer + name_len + 1, buffer_size - name_len - 1, *p->value, p->decimal);
         } else {
             buffer[0] = '\0';
         }
@@ -797,6 +799,7 @@ void canard_update() {
         processClearTasks(ts);
     }
 
+#ifdef DRV8305_SPI
     if (Flag_nFaultDroneCan) {
         Flag_nFaultDroneCan = 0;
 
@@ -807,6 +810,7 @@ void canard_update() {
             fault[i] = 0;
         }
     }
+#endif
 
     if (ts >= next_telem_service_at) {
         next_telem_service_at += 1000000ULL / settings.telem_rate;
