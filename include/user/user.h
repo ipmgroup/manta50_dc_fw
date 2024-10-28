@@ -95,7 +95,7 @@ extern "C" {
 //! \brief Defines the full scale current for the IQ variables, A
 //! \brief All currents are converted into (pu) based on the ratio to this value
 //! \brief WARNING: this value MUST be larger than the maximum current readings that you are expecting from the motor or the reading will roll over to 0, creating a control issue
-#define USER_IQ_FULL_SCALE_CURRENT_A (70.0)  // Manta100 DRV8323 = 70.0A GAIN-20V/V Rsh=1mR
+#define USER_IQ_FULL_SCALE_CURRENT_A (100.0)  // Manta100 DRV8323 = 70.0A GAIN-20V/V Rsh=1mR
 
 //! \brief Defines the maximum current at the AD converter
 //! \brief The value that will be represented by the maximum ADC input (3.3V) and conversion (0FFFh)
