@@ -139,7 +139,7 @@ extern "C" {
 //! \brief For higher PWM frequencies (60 KHz+ typical for low inductance, high current ripple motors) it is recommended to use the ePWM hardware
 //! \brief and adjustable ADC SOC to decimate the ADC conversion done interrupt to the control system, or to use the software Que example.
 //! \brief Otherwise you risk missing interrupts and disrupting the timing of the control state machine
-#define USER_PWM_FREQ_kHz (30.0)  // for CSD88599Q5DC - max 90KHz 30.0 Example, 8.0 - 30.0 KHz typical; 45-80 KHz may be required for very low inductance, high speed motors
+#define USER_PWM_FREQ_kHz (15.0)  // for CSD88599Q5DC - max 90KHz 30.0 Example, 8.0 - 30.0 KHz typical; 45-80 KHz may be required for very low inductance, high speed motors
 
 //! \brief Defines the maximum Voltage vector (Vs) magnitude allowed.  This value sets the maximum magnitude for the output of the
 //! \brief Id and Iq PI current controllers.  The Id and Iq current controller outputs are Vd and Vq.
@@ -150,6 +150,7 @@ extern "C" {
 //! \brief Set USER_MAX_VS_MAG = 2/3 = 0.6666 to create a trapezoidal voltage waveform.  Current reconstruction will be needed for this scenario (Lab10a-x).
 //! \brief For space vector over-modulation, see lab 10 for details on system requirements that will allow the SVM generator to go all the way to trapezoidal.
 #define USER_MAX_VS_MAG_PU (2.0 / 3.0)  // Set to 0.5 if a current reconstruction technique is not used.  Look at the module svgen_current in lab10a-x for more info.
+//#define USER_MAX_VS_MAG_PU (0.5)
 
 //! \brief Defines the address of estimator handle
 //!
@@ -175,7 +176,7 @@ extern "C" {
 // **************************************************************************
 //! \brief Defines the number of pwm clock ticks per isr clock tick
 //!        Note: Valid values are 1, 2 or 3 only
-#define USER_NUM_PWM_TICKS_PER_ISR_TICK (3) //3
+#define USER_NUM_PWM_TICKS_PER_ISR_TICK (1) //3
 
 //! \brief Defines the number of isr ticks (hardware) per controller clock tick (software)
 //! \brief Controller clock tick (CTRL) is the main clock used for all timing in the software
