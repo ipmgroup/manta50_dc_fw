@@ -1360,8 +1360,7 @@ void HAL_Spi_SW_EEPROM25AA02(HAL_Handle handle) {
 
 void HAL_setupTimers(HAL_Handle handle, const float_t systemFreq_MHz) {
     HAL_Obj *obj = (HAL_Obj *)handle;
-    uint32_t timerPeriod_cnts =
-        (uint32_t)(systemFreq_MHz * (float_t)1000000.0) - 1;
+    uint32_t timerPeriod_cnts = (uint32_t)(systemFreq_MHz * (float_t)1000000.0) - 1;
 
     // use timer 0 for frequency diagnostics
     TIMER_setDecimationFactor(obj->timerHandle[0], 0);
