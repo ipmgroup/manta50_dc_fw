@@ -12,8 +12,6 @@
 #include "main.h"
 #include "dronecan.h"
 #include "version.h"
-// #include "hal.h"
-// #include "Microchip_25AA02E48.h"
 
 // ###############################################################
 
@@ -89,8 +87,8 @@
 
 // #define EEPROM_VERIFICATION_NUMBER 0x13117535  // EEPROM verification number.
 #define EEPROM_VERIFICATION_NUMBER GIT_HASH  // EEPROM verification number.
-#define EEPROM_VERIFICATION_LENGTH 4      // Length of the verification number in bytes.
-#define EEPROM_VERIFICATION_ADDRESS 0x00  // Starting address of the verification number.
+#define EEPROM_VERIFICATION_LENGTH 4         // Length of the verification number in bytes.
+#define EEPROM_VERIFICATION_ADDRESS 0x00     // Starting address of the verification number.
 
 // ###############################################################
 

@@ -57,7 +57,6 @@
 
 #include "dronecan.h"
 
-
 #define CURRENT_BUF_LEN 16
 #define CURRENT_ADJUSTMENT_INTERCEPT 0
 #define CURRENT_ADJUSTMENT_SLOPE 1
@@ -129,8 +128,8 @@ CTRL_Obj *controller_obj;
 CTRL_Obj ctrl;  // v1p7 format
 #endif
 
-//volatile MOTOR_Vars_t gMotorVars = MOTOR_Vars_INIT;
-//volatile uint8_t isr_status = 0;
+// volatile MOTOR_Vars_t gMotorVars = MOTOR_Vars_INIT;
+// volatile uint8_t isr_status = 0;
 MOTOR_Vars_t gMotorVars = MOTOR_Vars_INIT;
 uint8_t isr_status = 0;
 

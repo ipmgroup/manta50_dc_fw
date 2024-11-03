@@ -23,8 +23,6 @@ extern bool Flag_Update_Settings;
 extern bool Flag_Arming;
 extern int16_t RAWcmd;
 extern uint64_t lastNonZeroRAWcmdTime;
-// extern uint32_t DroneCanActivityCounter;
-// extern uint32_t previousDroneCanActivityCounter;
 extern uint8_t error;
 extern bool Flag_nFaultDroneCan;
 extern uint16_t fault[4];
@@ -195,17 +193,6 @@ static void can_printf(const char *message, uint8_t level) {
                     len);
 }
 
-// float convertThrottle(int throttle, float max_speed, int middle_point) {
-//     if (middle_point == 1) {
-//         if (throttle < 0) {
-//             throttle = 0;
-//         }
-//         return ((float)throttle - 4095.0f) * max_speed / 4095.0f;
-//     } else {
-//         return (float)throttle * max_speed / 8191.0f;
-//     }
-// }
-
 uint32_t float_to_uint32(float value) {
     uint32_t result;
     memcpy(&result, &value, sizeof(float));
@@ -362,7 +349,6 @@ static void handle_ArmingStatus(CanardInstance *ins, CanardRxTransfer *transfer)
         gMotorVars.Flag_enableUserParams = 1;
     }
     settings.require_arming = 0;
-    // DroneCanActivityCounter++;
 }
 
 static void SaveProfile(void) {
@@ -486,7 +472,7 @@ void createStringFromParameter(const struct parameter *p, char *buffer, size_t b
             buffer[buffer_size - 1] = '\0';
 
             buffer[name_len] = ' ';
-             floatToStringInBuffer(buffer + name_len + 1, buffer_size - name_len - 1, *p->value, p->decimal);
+            floatToStringInBuffer(buffer + name_len + 1, buffer_size - name_len - 1, *p->value, p->decimal);
         } else {
             buffer[0] = '\0';
         }
@@ -593,7 +579,7 @@ static void send_ESCStatus(CanardInstance *ins) {
     pkt.current = _IQtoF(gMotorVars.Is_A);  // calcAvgCurrent();
     pkt.temperature = C_TO_KELVIN(measureTemperatureC());
     pkt.rpm = _IQtoF(gMotorVars.Speed_krpm) * 1000;
-    pkt.power_rating_pct = 0;  // how do we get this?
+    pkt.power_rating_pct = 0;
     pkt.esc_index = settings.esc_index;
 
     uint16_t len = uavcan_equipment_esc_Status_encode(&pkt, msg_buffer);

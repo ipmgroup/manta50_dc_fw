@@ -3,4 +3,4 @@
 
 #define GIT_HASH 0x2ce32082
 
-#endif // VERSION_H
+#endif  // VERSION_H
