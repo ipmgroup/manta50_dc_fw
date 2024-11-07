@@ -51,6 +51,8 @@ static bool Motor_Auto_ID = false;
 static uint8_t req_index = 0;
 static uint8_t setter = 0;
 
+static CanardCANFrame test_frame;
+
 ProfileState currentState = PHASE_IDLE;
 
 #pragma DATA_SECTION(str_node_id, "fstring");
@@ -655,6 +657,7 @@ void processTxRxOnce(int timeout_msec) {
             error = 1;
         } else if (rx_res > 0)  // Success - process the frame
         {
+            test_frame = rx_frame;
             canardHandleRxFrame(&canard, &rx_frame, timestamp);
         } else {
             ;  // Timeout - nothing to do
