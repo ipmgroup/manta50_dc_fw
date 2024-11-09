@@ -242,11 +242,6 @@
 			<locationURI>MW_INSTALL_DIR/sw/modules/usDelay/src/32b/f28x/usDelay.asm</locationURI>
 		</link>
 		<link>
-			<name>user.c</name>
-			<type>1</type>
-			<locationURI>MW_INSTALL_DIR/sw/modules/user/src/32b/user.c</locationURI>
-		</link>
-		<link>
 			<name>wdog.c</name>
 			<type>1</type>
 			<locationURI>MW_INSTALL_DIR/sw/drivers/wdog/src/32b/f28x/f2802x/wdog.c</locationURI>

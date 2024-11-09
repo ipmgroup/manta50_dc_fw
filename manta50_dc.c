@@ -410,8 +410,8 @@ void main(void) {
     FW_setOutput(fwHandle, _IQ(0.0));
 
     // Set the field weakening controller limits
-    FW_setMinMax(fwHandle, _IQ(USER_MAX_NEGATIVE_ID_REF_CURRENT_A / USER_IQ_FULL_SCALE_CURRENT_A), _IQ(0.0));
-    // FW_setMinMax(fwHandle, _IQ(gUserParams.maxNegativeIdCurrent_a / gUserParams.iqFullScaleCurrent_A), _IQ(0.0));
+    // FW_setMinMax(fwHandle, _IQ(USER_MAX_NEGATIVE_ID_REF_CURRENT_A / USER_IQ_FULL_SCALE_CURRENT_A), _IQ(0.0));
+    FW_setMinMax(fwHandle, _IQ(gUserParams.maxNegativeIdCurrent_a / gUserParams.iqFullScaleCurrent_A), _IQ(0.0));
 
     // setup faults
     HAL_setupFaults(halHandle);
@@ -451,10 +451,10 @@ void main(void) {
     CTRL_setFlag_enableDcBusComp(ctrlHandle, true);
 
     // compute scaling factors for flux and torque calculations
-    gFlux_pu_to_Wb_sf = USER_computeFlux_pu_to_Wb_sf();
-    gFlux_pu_to_VpHz_sf = USER_computeFlux_pu_to_VpHz_sf();
-    gTorque_Ls_Id_Iq_pu_to_Nm_sf = USER_computeTorque_Ls_Id_Iq_pu_to_Nm_sf();
-    gTorque_Flux_Iq_pu_to_Nm_sf = USER_computeTorque_Flux_Iq_pu_to_Nm_sf();
+    gFlux_pu_to_Wb_sf = USER_computeFlux_pu_to_Wb_sf(&gUserParams);
+    gFlux_pu_to_VpHz_sf = USER_computeFlux_pu_to_VpHz_sf(&gUserParams);
+    gTorque_Ls_Id_Iq_pu_to_Nm_sf = USER_computeTorque_Ls_Id_Iq_pu_to_Nm_sf(&gUserParams);
+    gTorque_Flux_Iq_pu_to_Nm_sf = USER_computeTorque_Flux_Iq_pu_to_Nm_sf(&gUserParams);
 
     extractFlagsFromControlWord(&settings, &gMotorVars);
     gMotorVars.MaxAccel_krpmps = _IQ(settings.acseleration);
@@ -578,13 +578,13 @@ void main(void) {
                         (ctrlState > CTRL_State_Idle) &&
                         (gMotorVars.CtrlVersion.minor == 6)) {
                         // call this function to fix 1p6
-                        USER_softwareUpdate1p6(ctrlHandle);
+                        USER_softwareUpdate1p6(ctrlHandle, &gUserParams);
                     }
                 }
             }
 
             if (EST_isMotorIdentified(obj->estHandle)) {
-                _iq Is_Max_squared_pu = _IQ((USER_MOTOR_MAX_CURRENT * USER_MOTOR_MAX_CURRENT) /
+                _iq Is_Max_squared_pu = _IQ((gUserParams.maxCurrent * gUserParams.maxCurrent) /
                                             (USER_IQ_FULL_SCALE_CURRENT_A * USER_IQ_FULL_SCALE_CURRENT_A));
                 _iq Id_squared_pu = _IQmpy(CTRL_getId_ref_pu(ctrlHandle), CTRL_getId_ref_pu(ctrlHandle));
 
@@ -607,7 +607,7 @@ void main(void) {
                 if (Flag_Latch_softwareUpdate) {
                     Flag_Latch_softwareUpdate = false;
 
-                    USER_calcPIgains(ctrlHandle);
+                    USER_calcPIgains(ctrlHandle, &gUserParams);
 
                     // initialize the watch window kp and ki current values with pre-calculated values
                     gMotorVars.Kp_Idq = CTRL_getKp(ctrlHandle, CTRL_Type_PID_Id);
