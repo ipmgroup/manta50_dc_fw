@@ -95,7 +95,7 @@ extern "C" {
 //! \brief Defines the full scale current for the IQ variables, A
 //! \brief All currents are converted into (pu) based on the ratio to this value
 //! \brief WARNING: this value MUST be larger than the maximum current readings that you are expecting from the motor or the reading will roll over to 0, creating a control issue
-#define USER_IQ_FULL_SCALE_CURRENT_A (100.0)  // Manta100 DRV8323 = 70.0A GAIN-20V/V Rsh=1mR
+#define USER_IQ_FULL_SCALE_CURRENT_A (82.5)  // Manta100 DRV8323 = 70.0A GAIN-20V/V Rsh=1mR
 
 //! \brief Defines the maximum current at the AD converter
 //! \brief The value that will be represented by the maximum ADC input (3.3V) and conversion (0FFFh)
@@ -118,16 +118,16 @@ extern "C" {
 //! \brief ADC current offsets for A, B, and C phases
 //! \brief One-time hardware dependent, though the calibration can be done at run-time as well
 //! \brief After initial board calibration these values should be updated for your specific hardware so they are available after compile in the binary to be loaded to the controller
-#define   I_A_offset (1.210729778)
-#define   I_B_offset (1.209441483)
-#define   I_C_offset (1.209092796)
+#define I_A_offset (1.210729778)
+#define I_B_offset (1.209441483)
+#define I_C_offset (1.209092796)
 
 //! \brief ADC voltage offsets for A, B, and C phases
 //! \brief One-time hardware dependent, though the calibration can be done at run-time as well
 //! \brief After initial board calibration these values should be updated for your specific hardware so they are available after compile in the binary to be loaded to the controller
-#define   V_A_offset (0.5084558129)
-#define   V_B_offset (0.5074239969)
-#define   V_C_offset (0.5065535307)
+#define V_A_offset (0.5084558129)
+#define V_B_offset (0.5074239969)
+#define V_C_offset (0.5065535307)
 
 //! \brief CLOCKS & TIMERS
 // **************************************************************************
@@ -150,7 +150,7 @@ extern "C" {
 //! \brief Set USER_MAX_VS_MAG = 2/3 = 0.6666 to create a trapezoidal voltage waveform.  Current reconstruction will be needed for this scenario (Lab10a-x).
 //! \brief For space vector over-modulation, see lab 10 for details on system requirements that will allow the SVM generator to go all the way to trapezoidal.
 #define USER_MAX_VS_MAG_PU (2.0 / 3.0)  // Set to 0.5 if a current reconstruction technique is not used.  Look at the module svgen_current in lab10a-x for more info.
-//#define USER_MAX_VS_MAG_PU (0.5)
+// #define USER_MAX_VS_MAG_PU (0.5)
 
 //! \brief Defines the address of estimator handle
 //!
@@ -176,7 +176,7 @@ extern "C" {
 // **************************************************************************
 //! \brief Defines the number of pwm clock ticks per isr clock tick
 //!        Note: Valid values are 1, 2 or 3 only
-#define USER_NUM_PWM_TICKS_PER_ISR_TICK (1) //3
+#define USER_NUM_PWM_TICKS_PER_ISR_TICK (1)  // 3
 
 //! \brief Defines the number of isr ticks (hardware) per controller clock tick (software)
 //! \brief Controller clock tick (CTRL) is the main clock used for all timing in the software
@@ -291,7 +291,7 @@ extern "C" {
 // **************************************************************************
 //! \brief Defines the analog voltage filter pole location, Hz
 //! \brief Must match the hardware filter for Vph
-#define USER_VOLTAGE_FILTER_POLE_Hz (338.36)   // Manta100
+#define USER_VOLTAGE_FILTER_POLE_Hz (338.36)  // Manta100
 
 //! \brief Defines the analog voltage filter pole location, rad/s
 //! \brief Compile time calculation from Hz to rad/s
@@ -347,6 +347,8 @@ extern "C" {
 #define TORCMAN430_20_14 124
 #define LPA_4035_14T 125
 #define JB48V250W 126
+#define HACKER_A40_12L 127
+#define HACKER_A40_14L 128
 // IPM motors
 // If user provides separate Ls-d, Ls-q
 // else treat as SPM with user or identified average Ls
@@ -379,12 +381,14 @@ extern "C" {
 // #define USER_MOTOR LPKF_CAD_CAM
 // #define USER_MOTOR lmt_1920_11
 // #define USER_MOTOR ILM70_10
-#define USER_MOTOR T200_R1
+// #define USER_MOTOR T200_R1
 // #define USER_MOTOR T100_R1
 // #define USER_MOTOR lmt_1920_18
 // #define USER_MOTOR TORCMAN430_20_14
 // #define USER_MOTOR LPA_4035_14T
 // #define USER_MOTOR JB48V250W
+// #define USER_MOTOR HACKER_A40_12L
+#define USER_MOTOR HACKER_A40_14L
 
 #if (USER_MOTOR == Estun_EMJ_04APB22)          // Name must match the motor #define
 #define USER_MOTOR_TYPE MOTOR_Type_Pm          // Motor_Type_Pm (All Synchronous: BLDC, PMSM, SMPM, IPM) or Motor_Type_Induction (Asynchronous ACI)
@@ -740,6 +744,34 @@ extern "C" {
 #define USER_MOTOR_RES_EST_CURRENT (1.0)
 #define USER_MOTOR_IND_EST_CURRENT (-0.5)
 #define USER_MOTOR_MAX_CURRENT (5.0)
+#define USER_MOTOR_FLUX_EST_FREQ_Hz (20.0)
+
+#elif (USER_MOTOR == HACKER_A40_12L)  //
+#define USER_MOTOR_TYPE MOTOR_Type_Pm
+#define USER_MOTOR_NUM_POLE_PAIRS (7)
+#define USER_MOTOR_Rr (NULL)
+#define USER_MOTOR_Rs (0.019458184)
+#define USER_MOTOR_Ls_d (1.3013404e-05)
+#define USER_MOTOR_Ls_q (1.3013404e-05)
+#define USER_MOTOR_RATED_FLUX (0.0126324389)
+#define USER_MOTOR_MAGNETIZING_CURRENT (NULL)
+#define USER_MOTOR_RES_EST_CURRENT (2)
+#define USER_MOTOR_IND_EST_CURRENT (-1)
+#define USER_MOTOR_MAX_CURRENT (24.0)
+#define USER_MOTOR_FLUX_EST_FREQ_Hz (150.0)
+
+#elif (USER_MOTOR == HACKER_A40_14L)  //
+#define USER_MOTOR_TYPE MOTOR_Type_Pm
+#define USER_MOTOR_NUM_POLE_PAIRS (7)
+#define USER_MOTOR_Rr (NULL)
+#define USER_MOTOR_Rs (0.0248364639)
+#define USER_MOTOR_Ls_d (1.38617552e-05)
+#define USER_MOTOR_Ls_q (1.38617552e-05)
+#define USER_MOTOR_RATED_FLUX (0.0141091244)
+#define USER_MOTOR_MAGNETIZING_CURRENT (NULL)
+#define USER_MOTOR_RES_EST_CURRENT (1)
+#define USER_MOTOR_IND_EST_CURRENT (-1)
+#define USER_MOTOR_MAX_CURRENT (80.0)
 #define USER_MOTOR_FLUX_EST_FREQ_Hz (20.0)
 
 #else
