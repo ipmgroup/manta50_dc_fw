@@ -21,8 +21,6 @@
                 "EEPROM_25AA02",
                 "NODE_ID=6",
                 "ARCH_BYTE16",
-                "DRV8305",
-                // "CANOPEN",
                 "LED_ON",
                 "CS_GPIO",
                 "FAST_ROM_V1p7",
