@@ -21,13 +21,12 @@ extern esc_t esc;
 extern bool Flag_Latch_Save;
 extern bool Flag_Update_Settings;
 extern bool Flag_Arming;
+extern bool Flag_Overheat;
 extern int16_t RAWcmd;
 extern uint64_t lastNonZeroRAWcmdTime;
-// extern uint32_t DroneCanActivityCounter;
-// extern uint32_t previousDroneCanActivityCounter;
 extern uint8_t error;
-#ifdef DRV8305_SPI
 extern bool Flag_nFaultDroneCan;
+#ifdef DRV8305_SPI
 extern uint16_t fault[4];
 #endif
 
@@ -49,6 +48,11 @@ static uint8_t canard_memory_pool[380];
 static uint8_t previousUserErrorCode = 0;
 static uint8_t previousCtrlState = 0;
 static uint8_t previousEstState = 0;
+
+static DeviceContext dc = {
+    .last_tx_delay_time = 0,
+    .tx_delay_duration_us = 5,
+    .error = 0};
 
 static bool Motor_Auto_ID = false;
 
@@ -645,44 +649,103 @@ static void processClearTasks(uint64_t timestamp_usec) {
     peak_percent = 100U * stats.peak_usage_blocks / stats.capacity_blocks;
 }
 
+// void processTxRxOnce(int timeout_msec) {
+//     // Transmitting
+//     const CanardCANFrame *txf;
+
+//     HAL_setupSpi_MCP2515(halHandle);
+//     for (txf = NULL; (txf = canardPeekTxQueue(&canard)) != NULL;) {
+//         uint64_t c;
+//         for (c = 200LL * 32; c; c--) {  // 1000LL
+//         }
+
+//         const int tx_res = canardC2000Transmit(txf);
+
+//         if (tx_res > 0) {  // Success - just drop the frame
+//             canardPopTxQueue(&canard);
+//         } else  // Timeout - just exit and try again later
+//         {
+//             break;
+//         }
+//     }
+
+//     if (getRcvFlag(halHandle->mcp2515Handle)) {
+//         // Receiving
+//         CanardCANFrame rx_frame;
+//         const uint64_t timestamp = getMonotonicTimestampUSec();
+//         const int rx_res = canardC2000Receive(&rx_frame);
+
+//         if (rx_res < 0) {  // Failure - report
+//             error = 1;
+//         } else if (rx_res > 0)  // Success - process the frame
+//         {
+//             canardHandleRxFrame(&canard, &rx_frame, timestamp);
+//         } else {
+//             ;  // Timeout - nothing to do
+//         }
+//         if (GPIO_read(halHandle->gpioHandle, halHandle->mcp2515Handle->gpio_INT)) {  // If MCP signals no more data in the buffer.
+//             setRcvFlag(halHandle->mcp2515Handle, 0);
+//             PIE_clearInt(((HAL_Obj *)halHandle)->pieHandle, PIE_GroupNumber_1);
+//         } else {
+//             setRcvFlag(halHandle->mcp2515Handle, 1);
+//         }
+//     }
+//     HAL_setupSpiA(halHandle);
+// }
+
 void processTxRxOnce(int timeout_msec) {
+    uint64_t start_time = getMonotonicTimestampUSec();
+    uint64_t timeout_us = timeout_msec * 1000ULL;  // Convert timeout to microseconds
+
     // Transmitting
     const CanardCANFrame *txf;
 
     HAL_setupSpi_MCP2515(halHandle);
     for (txf = NULL; (txf = canardPeekTxQueue(&canard)) != NULL;) {
-        uint64_t c;
-        for (c = 200LL * 32; c; c--) {  // 1000LL
+        // Check if the delay time since the last transmission has elapsed
+        if ((getMonotonicTimestampUSec() - dc.last_tx_delay_time) >= dc.tx_delay_duration_us) {
+            // Update the last delay time
+            dc.last_tx_delay_time = getMonotonicTimestampUSec();
+
+            // Transmit the frame
+            const int tx_res = canardC2000Transmit(txf);
+
+            if (tx_res > 0) {  // Successful - remove the frame from the queue
+                canardPopTxQueue(&canard);
+            } else {  // Error - exit transmission, try again later
+                break;
+            }
+        } else {
+            // If the delay has not yet elapsed, exit the loop to avoid blocking
+            break;
         }
 
-        const int tx_res = canardC2000Transmit(txf);
-
-        if (tx_res > 0) {  // Success - just drop the frame
-            canardPopTxQueue(&canard);
-        } else  // Timeout - just exit and try again later
-        {
-            break;
+        // Check the overall timeout
+        if ((getMonotonicTimestampUSec() - start_time) >= timeout_us) {
+            return;  // Time limit exceeded, exit the function
         }
     }
 
+    // Check the data reception flag
     if (getRcvFlag(halHandle->mcp2515Handle)) {
         // Receiving
         CanardCANFrame rx_frame;
         const uint64_t timestamp = getMonotonicTimestampUSec();
         const int rx_res = canardC2000Receive(&rx_frame);
 
-        if (rx_res < 0) {  // Failure - report
-            error = 1;
-        } else if (rx_res > 0)  // Success - process the frame
-        {
+        if (rx_res < 0) {  // Error during reception - set the error flag
+            dc.error = 1;
+        } else if (rx_res > 0) {  // Successful reception - process the frame
             canardHandleRxFrame(&canard, &rx_frame, timestamp);
-        } else {
-            ;  // Timeout - nothing to do
         }
-        if (GPIO_read(halHandle->gpioHandle, halHandle->mcp2515Handle->gpio_INT)) {  // If MCP signals no more data in the buffer.
+
+        // Check if there is more data in the MCP2515
+        if (GPIO_read(halHandle->gpioHandle, halHandle->mcp2515Handle->gpio_INT)) {
+            // If there is no more data in the buffer
             setRcvFlag(halHandle->mcp2515Handle, 0);
             PIE_clearInt(((HAL_Obj *)halHandle)->pieHandle, PIE_GroupNumber_1);
         } else {
+            // There is still data to read
             setRcvFlag(halHandle->mcp2515Handle, 1);
         }
     }
@@ -799,35 +862,42 @@ void canard_update() {
         processClearTasks(ts);
     }
 
-#ifdef DRV8305_SPI
     if (Flag_nFaultDroneCan) {
         Flag_nFaultDroneCan = 0;
 
+#ifdef DRV8305_SPI
         for (int i = 0; i < 4; i++) {
             if (fault[i] != 0) {
                 sendFaultMessage(fault[i], str_DrvError[i], buffer_str, sizeof(buffer_str));
             }
             fault[i] = 0;
         }
+#else
+        can_printf("nFault", UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_ERROR);
     }
+
 #endif
 
-    if (ts >= next_telem_service_at) {
-        next_telem_service_at += 1000000ULL / settings.telem_rate;
+        if (ts >= next_telem_service_at) {
+            next_telem_service_at += 1000000ULL / settings.telem_rate;
 
-        checkAndSendUpdates(buffer_str, sizeof(buffer_str));
-        if (Flag_Update_Settings) {
-            extractFlagsFromControlWord(&settings, &gMotorVars);
-            SettingsToMotorVars(&settings, &gMotorVars, &gUserParams);
-            Flag_Update_Settings = false;
-        } else {
-            settings.controll_word = updateControlWord(&gMotorVars);
-            MotorVarsToSettings(&gMotorVars, &settings, &gUserParams);
+            checkAndSendUpdates(buffer_str, sizeof(buffer_str));
+            if (Flag_Update_Settings) {
+                extractFlagsFromControlWord(&settings, &gMotorVars);
+                SettingsToMotorVars(&settings, &gMotorVars, &gUserParams);
+                Flag_Update_Settings = false;
+            } else {
+                settings.controll_word = updateControlWord(&gMotorVars);
+                MotorVarsToSettings(&gMotorVars, &settings, &gUserParams);
+            }
+            send_ESCStatus(&canard);
         }
-        send_ESCStatus(&canard);
+        if (Flag_Overheat) {
+            can_printf("Overheat", UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_ERROR);
+            Flag_Overheat = 0;
+        }
+        MotorAutoIdHandler();
+        CheckAndSaveProfile();
+        SendArmingStatus();
+        unpack_from_float(settings.midle_point, &midle_point_value, &esc_min_value, &esc_max_value);
     }
-    MotorAutoIdHandler();
-    CheckAndSaveProfile();
-    SendArmingStatus();
-    unpack_from_float(settings.midle_point, &midle_point_value, &esc_min_value, &esc_max_value);
-}

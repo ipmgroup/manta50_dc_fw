@@ -94,14 +94,16 @@ uint16_t gLEDcnt = 0;
 bool Flag_Latch_Save = false;
 bool Flag_Update_Settings = false;
 bool Flag_Arming = false;
+bool Flag_Overheat = false;
 
 int16_t RAWcmd = 0;
 uint64_t lastNonZeroRAWcmdTime = 0;
 uint32_t mcpResetCounter = 0;
 
-#ifdef DRV8305_SPI
+
 bool Flag_nFault = 0;
 bool Flag_nFaultDroneCan = 0;
+#ifdef DRV8305_SPI
 uint16_t ReadOnFaultCnt = 0;
 #endif
 
@@ -495,8 +497,9 @@ void main(void) {
         // loop while the enable system flag is true
         while (gMotorVars.Flag_enableSys) {
             // do the overtemperature check
-            if (_IQtoF(gMotorVars.TempSenDegCelsius) > 100.0) {
+            if (_IQtoF(gMotorVars.TempSenDegCelsius) > 120.0) {
                 gMotorVars.Flag_Run_Identify = false;
+                Flag_Overheat = true;
             }
 
             if (resetMcpTrigger) {
@@ -661,14 +664,11 @@ void main(void) {
 
             HAL_readDrvData(halHandle, &gDrvSpi8301Vars);
 #endif
-#ifdef DRV8305_SPI
-
             if (Flag_nFault) {
                 ReadOnFault();
-
                 Flag_nFault = 0;
             }
-
+#ifdef DRV8305_SPI
             HAL_writeDrvData(halHandle, &gDrvSpi8305Vars);
 
             HAL_readDrvData(halHandle, &gDrvSpi8305Vars);
@@ -862,16 +862,17 @@ __interrupt void MCP2515_rcvISR(void) {
     // PIE_clearInt(obj->pieHandle, PIE_GroupNumber_1);
 }
 #endif
-#ifdef DRV8301_SPI
+#ifdef DRV8305_SPI
 void getStatRegData() {
     fault[0] = DRV8305_readSpi(halHandle->drv8305Handle, Address_Status_1);
     fault[1] = DRV8305_readSpi(halHandle->drv8305Handle, Address_Status_2);
     fault[2] = DRV8305_readSpi(halHandle->drv8305Handle, Address_Status_3);
     fault[3] = DRV8305_readSpi(halHandle->drv8305Handle, Address_Status_4);
 }
-
+#endif
 
 void ReadOnFault() {
+#ifdef DRV8305_SPI
     if (DRV8305_isFault(halHandle->drv8305Handle)) {
         ReadOnFaultCnt++;
         gMotorVars.Flag_Run_Identify = 0;
@@ -882,8 +883,13 @@ void ReadOnFault() {
         gDrvSpi8305Vars.ManWriteData = 0x22;
         gDrvSpi8305Vars.ManWriteCmd = true;
     }
-}
+#else
+    if (!HAL_readGpio(halHandle->gpioHandle, GPIO_Number_12)) {
+        gMotorVars.Flag_Run_Identify = 0;
+        Flag_nFaultDroneCan = 1;
+    }
 #endif
+}
 
 #ifdef MCP2515
 void configMCP2515(uint8_t can_speed) {
