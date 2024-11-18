@@ -46,6 +46,11 @@ static uint8_t previousUserErrorCode = 0;
 static uint8_t previousCtrlState = 0;
 static uint8_t previousEstState = 0;
 
+static DeviceContext dc = {
+    .last_tx_delay_time = 0,
+    .tx_delay_duration_us = 5,
+    .error = 0};
+
 static bool Motor_Auto_ID = false;
 
 static uint8_t req_index = 0;
@@ -625,44 +630,103 @@ static void processClearTasks(uint64_t timestamp_usec) {
     peak_percent = 100U * stats.peak_usage_blocks / stats.capacity_blocks;
 }
 
+// void processTxRxOnce(int timeout_msec) {
+//     // Transmitting
+//     const CanardCANFrame *txf;
+
+//     HAL_setupSpi_MCP2515(halHandle);
+//     for (txf = NULL; (txf = canardPeekTxQueue(&canard)) != NULL;) {
+//         uint64_t c;
+//         for (c = 200LL * 32; c; c--) {  // 1000LL
+//         }
+
+//         const int tx_res = canardC2000Transmit(txf);
+
+//         if (tx_res > 0) {  // Success - just drop the frame
+//             canardPopTxQueue(&canard);
+//         } else  // Timeout - just exit and try again later
+//         {
+//             break;
+//         }
+//     }
+
+//     if (getRcvFlag(halHandle->mcp2515Handle)) {
+//         // Receiving
+//         CanardCANFrame rx_frame;
+//         const uint64_t timestamp = getMonotonicTimestampUSec();
+//         const int rx_res = canardC2000Receive(&rx_frame);
+
+//         if (rx_res < 0) {  // Failure - report
+//             error = 1;
+//         } else if (rx_res > 0)  // Success - process the frame
+//         {
+//             canardHandleRxFrame(&canard, &rx_frame, timestamp);
+//         } else {
+//             ;  // Timeout - nothing to do
+//         }
+//         if (GPIO_read(halHandle->gpioHandle, halHandle->mcp2515Handle->gpio_INT)) {  // If MCP signals no more data in the buffer.
+//             setRcvFlag(halHandle->mcp2515Handle, 0);
+//             PIE_clearInt(((HAL_Obj *)halHandle)->pieHandle, PIE_GroupNumber_1);
+//         } else {
+//             setRcvFlag(halHandle->mcp2515Handle, 1);
+//         }
+//     }
+//     HAL_setupSpiA(halHandle);
+// }
+
 void processTxRxOnce(int timeout_msec) {
+    uint64_t start_time = getMonotonicTimestampUSec();
+    uint64_t timeout_us = timeout_msec * 1000ULL;  // Convert timeout to microseconds
+
     // Transmitting
     const CanardCANFrame *txf;
 
     HAL_setupSpi_MCP2515(halHandle);
     for (txf = NULL; (txf = canardPeekTxQueue(&canard)) != NULL;) {
-        uint64_t c;
-        for (c = 200LL * 32; c; c--) {  // 1000LL
+        // Check if the delay time since the last transmission has elapsed
+        if ((getMonotonicTimestampUSec() - dc.last_tx_delay_time) >= dc.tx_delay_duration_us) {
+            // Update the last delay time
+            dc.last_tx_delay_time = getMonotonicTimestampUSec();
+
+            // Transmit the frame
+            const int tx_res = canardC2000Transmit(txf);
+
+            if (tx_res > 0) {  // Successful - remove the frame from the queue
+                canardPopTxQueue(&canard);
+            } else {  // Error - exit transmission, try again later
+                break;
+            }
+        } else {
+            // If the delay has not yet elapsed, exit the loop to avoid blocking
+            break;
         }
 
-        const int tx_res = canardC2000Transmit(txf);
-
-        if (tx_res > 0) {  // Success - just drop the frame
-            canardPopTxQueue(&canard);
-        } else  // Timeout - just exit and try again later
-        {
-            break;
+        // Check the overall timeout
+        if ((getMonotonicTimestampUSec() - start_time) >= timeout_us) {
+            return;  // Time limit exceeded, exit the function
         }
     }
 
+    // Check the data reception flag
     if (getRcvFlag(halHandle->mcp2515Handle)) {
         // Receiving
         CanardCANFrame rx_frame;
         const uint64_t timestamp = getMonotonicTimestampUSec();
         const int rx_res = canardC2000Receive(&rx_frame);
 
-        if (rx_res < 0) {  // Failure - report
-            error = 1;
-        } else if (rx_res > 0)  // Success - process the frame
-        {
+        if (rx_res < 0) {  // Error during reception - set the error flag
+            dc.error = 1;
+        } else if (rx_res > 0) {  // Successful reception - process the frame
             canardHandleRxFrame(&canard, &rx_frame, timestamp);
-        } else {
-            ;  // Timeout - nothing to do
         }
-        if (GPIO_read(halHandle->gpioHandle, halHandle->mcp2515Handle->gpio_INT)) {  // If MCP signals no more data in the buffer.
+
+        // Check if there is more data in the MCP2515
+        if (GPIO_read(halHandle->gpioHandle, halHandle->mcp2515Handle->gpio_INT)) {
+            // If there is no more data in the buffer
             setRcvFlag(halHandle->mcp2515Handle, 0);
             PIE_clearInt(((HAL_Obj *)halHandle)->pieHandle, PIE_GroupNumber_1);
         } else {
+            // There is still data to read
             setRcvFlag(halHandle->mcp2515Handle, 1);
         }
     }

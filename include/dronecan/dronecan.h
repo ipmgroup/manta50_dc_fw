@@ -15,6 +15,12 @@
 #include "dronecan_msgs.h"
 #include <math.h>
 
+typedef struct {
+    uint64_t last_tx_delay_time;
+    uint64_t tx_delay_duration_us;
+    int error;
+} DeviceContext;
+
 typedef enum {
     PHASE_IDLE,
     PHASE_SAVING
