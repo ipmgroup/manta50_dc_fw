@@ -100,7 +100,6 @@ int16_t RAWcmd = 0;
 uint64_t lastNonZeroRAWcmdTime = 0;
 uint32_t mcpResetCounter = 0;
 
-
 bool Flag_nFault = 0;
 bool Flag_nFaultDroneCan = 0;
 #ifdef DRV8305_SPI
@@ -179,9 +178,10 @@ THROTTLE_Handle throttleHandle;  //!< the trhottle input handle
 #endif
 
 #ifdef CPU_USAGE
-// define CPU time
+void updateCPUusage(void);
 CPU_TIME_Handle cpu_timeHandle;
 CPU_TIME_Obj cpu_time;
+float_t gCpu_usage_den = 0.0;
 #endif
 
 _iq gFlux_pu_to_Wb_sf;
@@ -302,6 +302,10 @@ int resetMcp() {
 
 void main(void) {
     uint_least8_t estNumber = 0;
+
+#ifdef CPU_USAGE
+    gCpu_usage_den = (float_t)cpu_time.pwm_period * (float_t)USER_NUM_PWM_TICKS_PER_ISR_TICK * 2.0;
+#endif
 
 #ifdef FAST_ROM_V1p6
     uint_least8_t ctrlNumber = 0;
@@ -652,6 +656,10 @@ void main(void) {
 
             // set field weakening enable flag depending on user's input
             FW_setFlag_enableFw(fwHandle, gMotorVars.Flag_enableFieldWeakening);
+#ifdef CPU_USAGE
+            // update CPU usage
+            updateCPUusage();
+#endif
 
             // enable/disable the forced angle
             EST_setFlag_enableForceAngle(obj->estHandle, gMotorVars.Flag_enableForceAngle);
@@ -687,6 +695,10 @@ void main(void) {
 }  // end of main() function
 
 interrupt void mainISR(void) {
+#ifdef CPU_USAGE
+    uint32_t timer1Cnt = HAL_readTimerCnt(halHandle, 2);
+    CPU_TIME_updateCnts(cpu_timeHandle, timer1Cnt);
+#endif
     // toggle status LED
     if (gLEDcnt++ > (uint_least32_t)(USER_ISR_FREQ_Hz / LED_BLINK_FREQ_Hz)) {
         HAL_toggleLed(halHandle, (GPIO_Number_e)HAL_Gpio_LED2);
@@ -749,6 +761,11 @@ interrupt void mainISR(void) {
 
     // setup the controller
     CTRL_setup(ctrlHandle);
+
+#ifdef CPU_USAGE
+    timer1Cnt = HAL_readTimerCnt(halHandle, 2);
+    CPU_TIME_run(cpu_timeHandle, timer1Cnt);
+#endif
 
     return;
 }  // end of mainISR() function
@@ -975,6 +992,18 @@ void SettingsToMotorVars(settings_t *settings, MOTOR_Vars_t *motorVars,
     UserParams->maxCurrent = settings->maxCurrent;
     UserParams->fluxEstFreq_Hz = settings->fluxEstFreq_Hz;
 }
+
+#ifdef CPU_USAGE
+void updateCPUusage(void) {
+    // calculate the minimum cpu usage percentage
+    gMotorVars.CpuUsagePercentageMin = (float_t)cpu_timeHandle->timer_delta_min / gCpu_usage_den * 100.0;
+    // calculate the average cpu usage percentage
+    gMotorVars.CpuUsagePercentageAvg = (float_t)cpu_timeHandle->timer_delta_avg / gCpu_usage_den * 100.0;
+    // calculate the maximum cpu usage percentage
+    gMotorVars.CpuUsagePercentageMax = (float_t)cpu_timeHandle->timer_delta_max / gCpu_usage_den * 100.0;
+    return;
+}  // end of updateCPUusage() function
+#endif
 
 //@} //defgroup
 // end of file
