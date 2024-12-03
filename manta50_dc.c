@@ -498,7 +498,7 @@ void main(void) {
         while (gMotorVars.Flag_enableSys) {
             // do the overtemperature check
             if (_IQtoF(gMotorVars.TempSenDegCelsius) > 120.0) {
-                gMotorVars.Flag_Run_Identify = false;
+                // gMotorVars.Flag_Run_Identify = false;
                 Flag_Overheat = true;
             }
 
