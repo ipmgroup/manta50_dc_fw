@@ -603,7 +603,7 @@ static void send_ESCStatus(CanardInstance *ins) {
     pkt.current = _IQtoF(gMotorVars.Is_A);  // calcAvgCurrent();
     pkt.temperature = C_TO_KELVIN(measureTemperatureC());
     pkt.rpm = _IQtoF(gMotorVars.Speed_krpm) * 1000;
-    pkt.power_rating_pct = 0;  // how do we get this?
+    pkt.power_rating_pct = (uint8_t)gMotorVars.CpuUsagePercentageAvg;
     pkt.esc_index = settings.esc_index;
 
     uint16_t len = uavcan_equipment_esc_Status_encode(&pkt, msg_buffer);

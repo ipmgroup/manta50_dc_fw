@@ -48,6 +48,7 @@
 #include "sw/modules/fw/src/32b/fw.h"
 #include "sw/modules/fem/src/32b/fem.h"
 #include "sw/modules/cpu_usage/src/32b/cpu_usage.h"
+#include "sw/modules/cpu_time/src/32b/cpu_time.h"
 
 // drivers
 
@@ -126,7 +127,11 @@
             _IQ(0.0),                           \
             _IQ(0.0),                           \
             {0, 0, 0},                          \
-        { 0, 0, 0 }                             \
+            {0, 0, 0},                          \
+            _IQ(0.0),                           \
+            0.0,                                \
+            0.0,                                \
+            0.0,                                \
     }
 
 // **************************************************************************
@@ -199,6 +204,9 @@ typedef struct _MOTOR_Vars_t_ {
     MATH_vec3 V_bias;
 
     _iq TempSenDegCelsius;
+    float_t CpuUsagePercentageMin;
+    float_t CpuUsagePercentageAvg;
+    float_t CpuUsagePercentageMax;
 
 } MOTOR_Vars_t;
 
@@ -234,24 +242,24 @@ typedef struct {
 
 // 3.02226843e+23
 
-#define settings_Vars_INIT \
-    {                      \
-        6,                 \
-        0,                 \
-        0,                 \
-        25.0,              \
-        12.0,              \
-        5.0,               \
-        109,               \
-        3.02226843e+23,    \
-        10,                \
-        10,                \
-        3.5,               \
-        0.057,             \
-        2.0,               \
-        -1.0,              \
-        15.0,              \
-        60.0,              \
+#define settings_Vars_INIT  \
+    {                       \
+        6,                  \
+            0,              \
+            0,              \
+            25.0,           \
+            12.0,           \
+            5.0,            \
+            109,            \
+            3.02226843e+23, \
+            10,             \
+            10,             \
+            3.5,            \
+            0.057,          \
+            2.0,            \
+            -1.0,           \
+            15.0,           \
+            60.0,           \
     }
 
 // **************************************************************************
